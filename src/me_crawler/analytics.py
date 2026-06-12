@@ -147,6 +147,226 @@ def analyze(txs: list[dict]) -> dict:
     }
 
 
+def dow_weekly_comparison(txs: list[dict]) -> dict | None:
+    """
+    Para cada dia da semana, calcula o gasto médio nas últimas 4 ocorrências
+    e o percentual acima/abaixo da média geral — revela dias consistentemente caros.
+    """
+    gastos = [t for t in txs if t.get("type") == "GASTO" and not t.get("isDisabled")]
+
+    by_date: dict[str, float] = defaultdict(float)
+    for t in gastos:
+        by_date[t.get("date", "?")] += t["value"]
+
+    dow_values: dict[str, list[float]] = defaultdict(list)
+    for date_str, total in sorted(by_date.items()):
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            dow_values[DOW_NAMES[d.weekday()]].append(total)
+        except ValueError:
+            pass
+
+    if not dow_values:
+        return None
+
+    dow_stats: dict[str, dict] = {}
+    for dow in DOW_NAMES:
+        if dow not in dow_values:
+            continue
+        vals = dow_values[dow][-4:]
+        avg = sum(vals) / len(vals)
+        dow_stats[dow] = {"avg": round(avg, 2), "weeks": [round(v, 2) for v in vals], "n": len(vals)}
+
+    if not dow_stats:
+        return None
+
+    overall = sum(v["avg"] for v in dow_stats.values()) / len(dow_stats)
+    for data in dow_stats.values():
+        data["pct_vs_avg"] = round((data["avg"] - overall) / overall * 100, 1) if overall else 0.0
+
+    worst = max(dow_stats.items(), key=lambda x: x[1]["avg"])
+    return {
+        "by_dow": dow_stats,
+        "overall_daily_avg": round(overall, 2),
+        "most_expensive": worst[0],
+        "most_expensive_pct": worst[1]["pct_vs_avg"],
+    }
+
+
+def detect_duplicates(txs: list[dict], days_window: int = 3) -> list[dict]:
+    """
+    Detecta pares de gastos com mesmo valor e mesma categoria em datas próximas.
+    Útil para identificar cobranças duplicadas ou compras esquecidas.
+    """
+    gastos = sorted(
+        [t for t in txs if t.get("type") == "GASTO" and not t.get("isDisabled")],
+        key=lambda x: x.get("date", ""),
+    )
+
+    suspected: list[dict] = []
+    seen_uuids: set[tuple] = set()
+
+    for i, t in enumerate(gastos):
+        cat = (t.get("category") or {}).get("categoryName", "")
+        val = t.get("value", 0)
+        try:
+            d = datetime.strptime(t.get("date", ""), "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        for prev in gastos[:i]:
+            prev_cat = (prev.get("category") or {}).get("categoryName", "")
+            prev_val = prev.get("value", 0)
+            try:
+                prev_d = datetime.strptime(prev.get("date", ""), "%Y-%m-%d")
+            except ValueError:
+                continue
+
+            if abs((d - prev_d).days) > days_window:
+                continue
+            if val != prev_val or cat != prev_cat:
+                continue
+
+            pair = tuple(sorted([t.get("uuid", ""), prev.get("uuid", "")]))
+            if pair in seen_uuids:
+                continue
+            seen_uuids.add(pair)
+            suspected.append({
+                "tx_a": prev,
+                "tx_b": t,
+                "value": val,
+                "category": cat,
+                "days_apart": abs((d - prev_d).days),
+            })
+
+    return suspected
+
+
+def monthly_pattern(txs: list[dict]) -> dict | None:
+    """
+    Mostra como os gastos se distribuem ao longo dos dias do mês —
+    revela se você gasta mais no começo, no meio ou no final do mês.
+    """
+    gastos = [t for t in txs if t.get("type") == "GASTO" and not t.get("isDisabled")]
+
+    by_day_num: dict[int, float] = defaultdict(float)
+    for t in gastos:
+        try:
+            by_day_num[datetime.strptime(t["date"], "%Y-%m-%d").day] += t["value"]
+        except (ValueError, KeyError):
+            pass
+
+    if not by_day_num:
+        return None
+
+    first_half = sum(v for k, v in by_day_num.items() if k <= 15)
+    second_half = sum(v for k, v in by_day_num.items() if k > 15)
+    total = first_half + second_half or 1
+
+    sorted_days = sorted(by_day_num.items())
+    top_days = sorted(by_day_num.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "first_half": round(first_half, 2),
+        "second_half": round(second_half, 2),
+        "first_half_pct": round(first_half / total * 100, 1),
+        "second_half_pct": round(second_half / total * 100, 1),
+        "by_day": {str(k): round(v, 2) for k, v in sorted_days},
+        "top_days": [{"day": d, "value": round(v, 2)} for d, v in top_days],
+        "peak_day": top_days[0][0] if top_days else 0,
+        "peak_value": round(top_days[0][1], 2) if top_days else 0,
+    }
+
+
+def top_suppliers(txs: list[dict], n: int = 15) -> list[dict]:
+    """
+    Agrupa gastos por descrição normalizada para identificar os fornecedores
+    onde mais dinheiro é gasto — base para negociação ou troca de hábito.
+    """
+    import re
+
+    gastos = [t for t in txs if t.get("type") == "GASTO" and not t.get("isDisabled")]
+
+    suppliers: dict[str, dict] = defaultdict(lambda: {"total": 0.0, "count": 0, "category": ""})
+    for t in gastos:
+        raw = (t.get("description") or "SEM DESCRIÇÃO").strip().upper()
+        name = re.sub(r"\s+\d+$", "", raw).strip()  # remove código de loja no final
+        suppliers[name]["total"] = round(suppliers[name]["total"] + t["value"], 2)
+        suppliers[name]["count"] += 1
+        if not suppliers[name]["category"]:
+            suppliers[name]["category"] = (t.get("category") or {}).get("categoryName", "—")
+
+    return sorted(
+        [
+            {
+                "name": name,
+                "total": data["total"],
+                "count": data["count"],
+                "avg_ticket": round(data["total"] / data["count"], 2),
+                "category": data["category"],
+            }
+            for name, data in suppliers.items()
+        ],
+        key=lambda x: x["total"],
+        reverse=True,
+    )[:n]
+
+
+def open_installments(txs: list[dict]) -> dict | None:
+    """
+    Calcula quanto das compras parceladas já está comprometido para os próximos meses.
+    """
+    parceladas = [
+        t for t in txs
+        if t.get("installment") and t.get("type") == "GASTO" and not t.get("isDisabled")
+    ]
+    if not parceladas:
+        return None
+
+    def _extract(inst: dict) -> tuple[int, int] | None:
+        current = inst.get("currentInstallment") or inst.get("current") or inst.get("number")
+        total = inst.get("totalInstallments") or inst.get("total")
+        if current and total:
+            return int(current), int(total)
+        return None
+
+    items = []
+    total_remaining = 0.0
+
+    for t in parceladas:
+        inst = t.get("installment")
+        if not isinstance(inst, dict):
+            continue
+        info = _extract(inst)
+        if not info:
+            continue
+        current, total_inst = info
+        remaining = total_inst - current
+        if remaining <= 0:
+            continue
+        monthly = inst.get("installmentValue") or inst.get("value") or t.get("value", 0)
+        remaining_value = remaining * float(monthly)
+        total_remaining += remaining_value
+        items.append({
+            "description": t.get("description", "—"),
+            "category": (t.get("category") or {}).get("categoryName", "—"),
+            "current": current,
+            "total": total_inst,
+            "remaining": remaining,
+            "monthly_value": round(float(monthly), 2),
+            "total_remaining": round(remaining_value, 2),
+        })
+
+    if not items:
+        return None
+
+    return {
+        "items": sorted(items, key=lambda x: x["total_remaining"], reverse=True)[:10],
+        "total_remaining": round(total_remaining, 2),
+        "count": len(items),
+    }
+
+
 def compare(current: dict, previous: dict) -> dict | None:
     """
     Compara duas análises (analyze()) — tipicamente mês atual vs anterior.

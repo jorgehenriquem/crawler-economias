@@ -5,7 +5,19 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from me_crawler import analytics
-from me_crawler.analytics import COLORS, METHOD_LABELS, analyze, brl, compare
+from me_crawler.analytics import (
+    COLORS,
+    DOW_NAMES,
+    METHOD_LABELS,
+    analyze,
+    brl,
+    compare,
+    detect_duplicates,
+    dow_weekly_comparison,
+    monthly_pattern,
+    open_installments,
+    top_suppliers,
+)
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +52,30 @@ def _chart_data(a: dict) -> dict:
     }
 
 
+def _dow_chart_data(dow_result: dict | None) -> dict:
+    if not dow_result:
+        return {"labels": [], "avgs": [], "colors": []}
+    stats = dow_result["by_dow"]
+    labels = [d for d in DOW_NAMES if d in stats]
+    avgs = [stats[d]["avg"] for d in labels]
+    colors = [
+        "#ef4444" if stats[d]["pct_vs_avg"] > 15
+        else "#f59e0b" if stats[d]["pct_vs_avg"] > 0
+        else "#10b981"
+        for d in labels
+    ]
+    return {"labels": labels, "avgs": avgs, "colors": colors}
+
+
+def _monthly_chart_data(pattern: dict | None) -> dict:
+    if not pattern:
+        return {"labels": [], "values": []}
+    return {
+        "labels": list(pattern["by_day"].keys()),
+        "values": list(pattern["by_day"].values()),
+    }
+
+
 def render(
     transactions: list[dict],
     title: str,
@@ -52,6 +88,12 @@ def render(
     if previous_transactions:
         comparison = compare(a, analytics.analyze(previous_transactions))
 
+    dow = dow_weekly_comparison(transactions)
+    duplicates = detect_duplicates(transactions)
+    pattern = monthly_pattern(transactions)
+    suppliers = top_suppliers(transactions)
+    installments = open_installments(transactions)
+
     html = _env.get_template("dashboard.html").render(
         title=title,
         generated_at=date.today().isoformat(),
@@ -61,6 +103,13 @@ def render(
         method_labels=METHOD_LABELS,
         resultado_color="#10b981" if a["resultado"] >= 0 else "#ef4444",
         resultado_sign="+" if a["resultado"] >= 0 else "−",
+        dow=dow,
+        dow_chart=_dow_chart_data(dow),
+        duplicates=duplicates,
+        pattern=pattern,
+        monthly_chart=_monthly_chart_data(pattern),
+        suppliers=suppliers,
+        installments=installments,
     )
     output.write_text(html, encoding="utf-8")
     log.info("Dashboard salvo em: %s", output)

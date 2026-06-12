@@ -77,6 +77,25 @@
   .delta-na { color: #94a3b8; }
 
   .empty { text-align: center; padding: 48px; color: #94a3b8; font-size: .9rem; }
+
+  /* INSIGHTS FINANCEIROS */
+  .warning-card { background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 14px;
+                  padding: 18px 22px; margin-bottom: 4px; }
+  .warning-title { font-size: .82rem; font-weight: 700; color: #92400e; margin-bottom: 12px;
+                   display: flex; align-items: center; gap: 8px; }
+  .half-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .half-card { background: #fff; border-radius: 14px; padding: 22px;
+               box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+               display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .half-label { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .8px; color: #94a3b8; margin-bottom: 6px; }
+  .half-value { font-size: 2.2rem; font-weight: 900; }
+  .half-sub { font-size: .8rem; color: #64748b; margin-top: 4px; }
+  .installment-badge { background: #fef3c7; color: #92400e; font-size: .7rem; font-weight: 700;
+                       padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .bar-inline { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; margin-top: 4px; }
+  .bar-fill { height: 100%; border-radius: 3px; background: #6366f1; }
+  @media (max-width: 600px) { .half-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -221,6 +240,157 @@
     </div>
     {% endif %}
   </div>
+
+  <!-- ── GASTOS POR DIA DA SEMANA ───────────────────────────────────── -->
+  {% if dow %}
+  <div class="section-title">Padrão por Dia da Semana</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#6366f1"></span>Gasto médio por dia da semana</div>
+      <div class="chart-wrap h260"><canvas id="dowChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="display:flex;flex-direction:column;gap:10px;justify-content:center">
+      <div class="chart-title"><span class="dot" style="background:#ef4444"></span>Ranking de dias</div>
+      {% for dow_name, data in dow.by_dow.items() %}
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:.82rem;font-weight:600;color:#334155">{{ dow_name }}</span>
+          <span style="font-size:.82rem;font-weight:700;color:{% if data.pct_vs_avg > 15 %}#ef4444{% elif data.pct_vs_avg > 0 %}#f59e0b{% else %}#10b981{% endif %}">
+            {{ data.avg | brl }}
+            ({% if data.pct_vs_avg > 0 %}+{% endif %}{{ "%.0f" | format(data.pct_vs_avg) }}%)
+          </span>
+        </div>
+        <div class="bar-inline">
+          <div class="bar-fill" style="width:{{ [data.avg / dow.by_dow.values()|map(attribute='avg')|max * 100, 100]|min|round }}%;background:{% if data.pct_vs_avg > 15 %}#ef4444{% elif data.pct_vs_avg > 0 %}#f59e0b{% else %}#10b981{% endif %}"></div>
+        </div>
+      </div>
+      {% endfor %}
+      <div style="font-size:.75rem;color:#94a3b8;margin-top:4px">
+        Média diária geral: {{ dow.overall_daily_avg | brl }} &nbsp;·&nbsp;
+        Dia mais caro: <strong>{{ dow.most_expensive }}</strong> (+{{ "%.0f" | format(dow.most_expensive_pct) }}%)
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── CONCENTRAÇÃO NO MÊS ────────────────────────────────────────── -->
+  {% if pattern %}
+  <div class="section-title">Distribuição dos Gastos no Mês</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#8b5cf6"></span>Gasto por dia do mês</div>
+      <div class="chart-wrap h260"><canvas id="monthlyChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="display:flex;flex-direction:column;gap:16px;justify-content:center">
+      <div class="half-grid">
+        <div class="half-card" style="border-left:4px solid #6366f1">
+          <div class="half-label">1ª quinzena</div>
+          <div class="half-value" style="color:#6366f1">{{ "%.0f" | format(pattern.first_half_pct) }}%</div>
+          <div class="half-sub">{{ pattern.first_half | brl }}</div>
+        </div>
+        <div class="half-card" style="border-left:4px solid #f59e0b">
+          <div class="half-label">2ª quinzena</div>
+          <div class="half-value" style="color:#f59e0b">{{ "%.0f" | format(pattern.second_half_pct) }}%</div>
+          <div class="half-sub">{{ pattern.second_half | brl }}</div>
+        </div>
+      </div>
+      <div class="table-card" style="box-shadow:none;border:1px solid #f1f5f9">
+        <table>
+          <thead><tr><th>Dia de pico</th><th style="text-align:right">Gasto</th></tr></thead>
+          <tbody>
+            {% for d in pattern.top_days %}
+            <tr>
+              <td style="font-weight:600">Dia {{ d.day }}</td>
+              <td class="val-cell">{{ d.value | brl }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── TOP FORNECEDORES ───────────────────────────────────────────── -->
+  {% if suppliers %}
+  <div class="section-title">Top Fornecedores</div>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr><th></th><th>Fornecedor</th><th>Categoria</th><th style="text-align:right">Transações</th><th style="text-align:right">Ticket médio</th><th style="text-align:right">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr>
+          <td class="rank">#{{ loop.index }}</td>
+          <td class="desc" title="{{ s.name }}">{{ s.name | truncate(40) }}</td>
+          <td><span class="tag">{{ s.category }}</span></td>
+          <td class="num">{{ s.count }}x</td>
+          <td class="num">{{ s.avg_ticket | brl }}</td>
+          <td class="val-cell">{{ s.total | brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ── DUPLICATAS SUSPEITAS ───────────────────────────────────────── -->
+  {% if duplicates %}
+  <div class="section-title">⚠️ Possíveis Duplicatas</div>
+  <div class="warning-card">
+    <div class="warning-title">⚠️ {{ duplicates|length }} par(es) suspeito(s) — mesmo valor e categoria em datas próximas. Verifique se não houve cobrança dupla.</div>
+    <table style="font-size:.8rem">
+      <thead>
+        <tr><th>Descrição A</th><th>Data A</th><th>Descrição B</th><th>Data B</th><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Dias de diferença</th></tr>
+      </thead>
+      <tbody>
+        {% for dup in duplicates %}
+        <tr>
+          <td class="desc" title="{{ dup.tx_a.description }}">{{ dup.tx_a.description | truncate(30) }}</td>
+          <td class="mono">{{ dup.tx_a.date }}</td>
+          <td class="desc" title="{{ dup.tx_b.description }}">{{ dup.tx_b.description | truncate(30) }}</td>
+          <td class="mono">{{ dup.tx_b.date }}</td>
+          <td><span class="tag">{{ dup.category }}</span></td>
+          <td class="val-cell">{{ dup.value | brl }}</td>
+          <td class="num">{{ dup.days_apart }}d</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ── PARCELAS EM ABERTO ─────────────────────────────────────────── -->
+  {% if installments %}
+  <div class="section-title">Parcelas em Aberto</div>
+  <div class="chart-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#94a3b8">Total comprometido nos próximos meses</div>
+        <div style="font-size:2rem;font-weight:900;color:#ef4444;margin-top:4px">{{ installments.total_remaining | brl }}</div>
+      </div>
+      <span class="installment-badge">{{ installments.count }} compra(s) parcelada(s)</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Descrição</th><th>Categoria</th><th style="text-align:center">Parcela</th><th style="text-align:right">Restam</th><th style="text-align:right">Valor/mês</th><th style="text-align:right">Total restante</th></tr>
+      </thead>
+      <tbody>
+        {% for inst in installments.items %}
+        <tr>
+          <td class="desc" title="{{ inst.description }}">{{ inst.description | truncate(40) }}</td>
+          <td><span class="tag">{{ inst.category }}</span></td>
+          <td class="num">{{ inst.current }}/{{ inst.total }}</td>
+          <td class="num">{{ inst.remaining }}x</td>
+          <td class="num">{{ inst.monthly_value | brl }}</td>
+          <td class="val-cell">{{ inst.total_remaining | brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <div class="section-title">Top 10 Maiores Gastos</div>
   {% if a.top10 %}
@@ -387,6 +557,64 @@ new Chart(document.getElementById("subChart"), {
   },
   options: hbarOptions
 });
+
+{% if dow_chart and dow_chart.labels %}
+new Chart(document.getElementById("dowChart"), {
+  type: "bar",
+  data: {
+    labels: {{ dow_chart.labels | tojson }},
+    datasets: [{
+      label: "Gasto médio",
+      data: {{ dow_chart.avgs | tojson }},
+      backgroundColor: {{ dow_chart.colors | tojson }},
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { grid: { color: "#f1f5f9" },
+           ticks: { callback: v => "R$" + (v/1000).toFixed(1) + "k", font: { size: 10 } } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => " Média: " + brl(ctx.raw) } }
+    }
+  }
+});
+{% endif %}
+
+{% if monthly_chart and monthly_chart.labels %}
+new Chart(document.getElementById("monthlyChart"), {
+  type: "bar",
+  data: {
+    labels: {{ monthly_chart.labels | tojson }},
+    datasets: [{
+      label: "Gasto",
+      data: {{ monthly_chart.values | tojson }},
+      backgroundColor: "rgba(139,92,246,.65)",
+      borderColor: "#8b5cf6",
+      borderWidth: 1.5,
+      borderRadius: 4,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: "#f1f5f9" },
+           ticks: { callback: v => brl(v), font: { size: 10 } } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => " Dia " + ctx.label + ": " + brl(ctx.raw) } }
+    }
+  }
+});
+{% endif %}
 </script>
 </body>
 </html>
