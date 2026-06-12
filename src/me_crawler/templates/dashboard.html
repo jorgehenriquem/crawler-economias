@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · {{ title }}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: #f1f5f9; color: #0f172a; min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+             color: #fff; padding: 28px 32px; display: flex;
+             justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.5px; }
+  .header .sub { font-size: .85rem; opacity: .8; margin-top: 4px; }
+  .header .gen { font-size: .78rem; opacity: .65; text-align: right; }
+
+  .main { max-width: 1280px; margin: 0 auto; padding: 24px 20px 48px; }
+  .section-title { font-size: .7rem; font-weight: 700; letter-spacing: 1.5px;
+                    text-transform: uppercase; color: #64748b; margin: 32px 0 12px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .card { background: #fff; border-radius: 14px; padding: 20px 22px;
+           box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04); }
+  .card-label { font-size: .72rem; font-weight: 600; letter-spacing: .8px;
+                 text-transform: uppercase; color: #94a3b8; margin-bottom: 8px; }
+  .card-value { font-size: 1.65rem; font-weight: 800; letter-spacing: -.5px; }
+  .card-sub { font-size: .78rem; color: #94a3b8; margin-top: 4px; }
+  .card-value.red { color: #ef4444; }
+  .card-value.green { color: #10b981; }
+  .card-value.indigo { color: #6366f1; }
+  .card-accent { width: 36px; height: 4px; border-radius: 4px; margin-bottom: 12px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  .chart-card { background: #fff; border-radius: 14px; padding: 22px;
+                 box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04); }
+  .chart-title { font-size: .82rem; font-weight: 700; color: #475569; margin-bottom: 16px;
+                  display: flex; align-items: center; gap: 6px; }
+  .chart-title .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-wrap.h260 { height: 260px; }
+  .chart-wrap.h220 { height: 220px; }
+  .chart-wrap canvas { max-height: 100% !important; }
+
+  .insights { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .ins-card { background: #fff; border-radius: 14px; padding: 18px 16px; text-align: center;
+               box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04); }
+  .ins-icon { font-size: 2rem; margin-bottom: 8px; }
+  .ins-label { font-size: .68rem; font-weight: 700; letter-spacing: .8px;
+                text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
+  .ins-value { font-size: 1.15rem; font-weight: 800; color: #1e293b; }
+  .ins-sub { font-size: .72rem; color: #94a3b8; margin-top: 3px; }
+
+  .table-card { background: #fff; border-radius: 14px; overflow: hidden;
+                 box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  th { background: #f8fafc; padding: 10px 14px; text-align: left;
+        font-size: .68rem; font-weight: 700; letter-spacing: .8px;
+        text-transform: uppercase; color: #94a3b8; }
+  td { padding: 11px 14px; border-top: 1px solid #f1f5f9; color: #334155; }
+  tr:hover td { background: #fafbff; }
+  td.rank { font-weight: 700; color: #94a3b8; font-size: .78rem; width: 36px; }
+  td.desc { font-weight: 500; max-width: 220px; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; color: #0f172a; }
+  td.mono { font-family: monospace; font-size: .8rem; }
+  td.val-cell { font-weight: 700; color: #ef4444; text-align: right; white-space: nowrap; }
+  td.num { text-align: right; white-space: nowrap; }
+  .tag { background: #ede9fe; color: #7c3aed; font-size: .7rem; font-weight: 600;
+          padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .delta-up { color: #ef4444; font-weight: 700; }
+  .delta-down { color: #10b981; font-weight: 700; }
+  .delta-na { color: #94a3b8; }
+
+  .empty { text-align: center; padding: 48px; color: #94a3b8; font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 Dashboard Financeiro</h1>
+    <div class="sub">{{ title }}</div>
+  </div>
+  <div class="gen">Gerado em {{ generated_at }}<br>{{ a.n_transacoes }} transações analisadas</div>
+</div>
+
+<div class="main">
+
+  <div class="section-title">Resumo</div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-accent" style="background:#ef4444"></div>
+      <div class="card-label">Total de Gastos</div>
+      <div class="card-value red">{{ a.total_gastos | brl }}</div>
+      <div class="card-sub">{{ a.n_gastos }} transações</div>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:#10b981"></div>
+      <div class="card-label">Total de Ganhos</div>
+      <div class="card-value green">{{ a.total_ganhos | brl }}</div>
+      <div class="card-sub">{{ a.n_ganhos }} transações</div>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:{{ resultado_color }}"></div>
+      <div class="card-label">Resultado</div>
+      <div class="card-value" style="color:{{ resultado_color }}">{{ resultado_sign }}{{ a.resultado | brl }}</div>
+      <div class="card-sub">{{ "saldo positivo 🎉" if a.resultado >= 0 else "no vermelho ⚠️" }}</div>
+    </div>
+    <div class="card">
+      <div class="card-accent" style="background:#6366f1"></div>
+      <div class="card-label">Ticket Médio</div>
+      <div class="card-value indigo">{{ a.ticket_medio | brl }}</div>
+      <div class="card-sub">por gasto</div>
+    </div>
+    {% if comparison %}
+    <div class="card">
+      <div class="card-accent" style="background:{{ '#ef4444' if comparison.delta_pct > 0 else '#10b981' }}"></div>
+      <div class="card-label">vs Mês Anterior</div>
+      <div class="card-value" style="color:{{ '#ef4444' if comparison.delta_pct > 0 else '#10b981' }}">
+        {{ "%+.1f" | format(comparison.delta_pct) }}%
+      </div>
+      <div class="card-sub">anterior: {{ comparison.prev_total | brl }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="section-title">Composição dos Gastos</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#6366f1"></span>Por Categoria</div>
+      <div class="chart-wrap h260"><canvas id="catChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#ef4444"></span>Gastos vs Ganhos por Dia (com média móvel 7d)</div>
+      <div class="chart-wrap h260"><canvas id="dayChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Evolução Acumulada</div>
+  <div class="chart-card">
+    <div class="chart-title"><span class="dot" style="background:#6366f1"></span>Gasto acumulado ao longo do período</div>
+    <div class="chart-wrap h260"><canvas id="cumChart"></canvas></div>
+  </div>
+
+  <div class="section-title">Detalhamento</div>
+  <div class="grid-3">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#f59e0b"></span>Por Forma de Pagamento</div>
+      <div class="chart-wrap h220"><canvas id="metChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#10b981"></span>Por Conta</div>
+      <div class="chart-wrap h220"><canvas id="accChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#8b5cf6"></span>Top Subcategorias</div>
+      <div class="chart-wrap h220"><canvas id="subChart"></canvas></div>
+    </div>
+  </div>
+
+  {% if comparison %}
+  <div class="section-title">Comparação com o Mês Anterior</div>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr><th>Categoria</th><th style="text-align:right">Mês atual</th><th style="text-align:right">Mês anterior</th><th style="text-align:right">Variação</th></tr>
+      </thead>
+      <tbody>
+        {% for row in comparison.rows %}
+        <tr>
+          <td><span class="tag">{{ row.category }}</span></td>
+          <td class="num">{{ row.current | brl }}</td>
+          <td class="num">{{ row.previous | brl }}</td>
+          <td class="num">
+            {% if row.delta_pct is none %}
+              <span class="delta-na">novo</span>
+            {% elif row.delta_pct > 0 %}
+              <span class="delta-up">▲ {{ "%.1f" | format(row.delta_pct) }}%</span>
+            {% else %}
+              <span class="delta-down">▼ {{ "%.1f" | format(-row.delta_pct) }}%</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="section-title">Insights</div>
+  <div class="insights">
+    <div class="ins-card">
+      <div class="ins-icon">💸</div>
+      <div class="ins-label">Dia mais caro</div>
+      <div class="ins-value">{{ a.dia_mais_caro[0] }}</div>
+      <div class="ins-sub">{{ a.dia_mais_caro[1] | brl }}</div>
+    </div>
+    <div class="ins-card">
+      <div class="ins-icon">🏆</div>
+      <div class="ins-label">Categoria campeã</div>
+      <div class="ins-value">{{ a.top_cat[0] }}</div>
+      <div class="ins-sub">{{ "%.1f" | format(a.top_cat_pct) }}% dos gastos</div>
+    </div>
+    <div class="ins-card">
+      <div class="ins-icon">📆</div>
+      <div class="ins-label">Dia da semana</div>
+      <div class="ins-value">{{ a.busiest_dow[0] }}</div>
+      <div class="ins-sub">mais gastos — {{ a.busiest_dow[1] | brl }}</div>
+    </div>
+    {% if a.projected %}
+    <div class="ins-card">
+      <div class="ins-icon">📅</div>
+      <div class="ins-label">Projeção 30 dias</div>
+      <div class="ins-value">{{ a.projected | brl }}</div>
+      <div class="ins-sub">se manter o ritmo atual</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="section-title">Top 10 Maiores Gastos</div>
+  {% if a.top10 %}
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr><th></th><th>Descrição</th><th>Categoria</th><th>Data</th><th>Conta</th><th>Método</th><th style="text-align:right">Valor</th></tr>
+      </thead>
+      <tbody>
+        {% for t in a.top10 %}
+        <tr>
+          <td class="rank">#{{ loop.index }}</td>
+          <td class="desc" title="{{ t.description }}">{{ t.description | truncate(45) }}</td>
+          <td><span class="tag">{{ (t.category or {}).get("categoryName", "—") }}</span></td>
+          <td class="mono">{{ t.date }}</td>
+          <td>{{ (t.account or {}).get("name", "—") }}</td>
+          <td>{{ method_labels.get(t.paymentMethod, t.paymentMethod or "—") }}</td>
+          <td class="val-cell">{{ t.value | brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">Nenhuma transação de gasto no período.</div>
+  {% endif %}
+
+</div>
+
+<script>
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.color = "#64748b";
+
+const brl = v => "R$ " + Math.abs(v).toFixed(2)
+  .replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+new Chart(document.getElementById("catChart"), {
+  type: "doughnut",
+  data: {
+    labels: {{ charts.cat_labels | tojson }},
+    datasets: [{ data: {{ charts.cat_values | tojson }}, backgroundColor: {{ charts.cat_colors | tojson }},
+                 borderWidth: 2, borderColor: "#fff", hoverOffset: 6 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: "62%",
+    plugins: {
+      legend: { position: "right", labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => " " + ctx.label + ": " + brl(ctx.raw) } }
+    }
+  }
+});
+
+new Chart(document.getElementById("dayChart"), {
+  data: {
+    labels: {{ charts.day_labels | tojson }},
+    datasets: [
+      { type: "bar", label: "Gastos", data: {{ charts.day_gastos | tojson }}, backgroundColor: "#fca5a5",
+        borderColor: "#ef4444", borderWidth: 1.5, borderRadius: 4 },
+      { type: "bar", label: "Ganhos", data: {{ charts.day_ganhos | tojson }}, backgroundColor: "#6ee7b7",
+        borderColor: "#10b981", borderWidth: 1.5, borderRadius: 4 },
+      { type: "line", label: "Média móvel 7d", data: {{ charts.ma7 | tojson }},
+        borderColor: "#6366f1", borderWidth: 2, borderDash: [6, 3],
+        pointRadius: 0, tension: 0.4, fill: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: "#f1f5f9" },
+           ticks: { callback: v => "R$" + (v/1000).toFixed(1) + "k", font: { size: 10 } } }
+    },
+    plugins: {
+      legend: { labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => " " + ctx.dataset.label + ": " + brl(ctx.raw) } }
+    }
+  }
+});
+
+new Chart(document.getElementById("cumChart"), {
+  type: "line",
+  data: {
+    labels: {{ charts.day_labels | tojson }},
+    datasets: [{
+      label: "Gasto acumulado",
+      data: {{ charts.cumulative | tojson }},
+      borderColor: "#6366f1",
+      backgroundColor: "rgba(99,102,241,.10)",
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointBackgroundColor: "#6366f1",
+      pointBorderColor: "#fff",
+      pointBorderWidth: 2
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: "#f1f5f9" },
+           ticks: { callback: v => brl(v), font: { size: 10 } } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => " Acumulado: " + brl(ctx.raw) } }
+    }
+  }
+});
+
+const hbarOptions = {
+  indexAxis: "y",
+  responsive: true, maintainAspectRatio: false,
+  scales: {
+    x: { grid: { color: "#f1f5f9" }, ticks: { callback: v => brl(v), font: { size: 9 } } },
+    y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+  },
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: ctx => " " + brl(ctx.raw) } }
+  }
+};
+
+new Chart(document.getElementById("metChart"), {
+  type: "bar",
+  data: {
+    labels: {{ charts.met_labels | tojson }},
+    datasets: [{ data: {{ charts.met_values | tojson }}, backgroundColor: {{ charts.met_colors | tojson }},
+                 borderRadius: 5, borderSkipped: false }]
+  },
+  options: {
+    ...hbarOptions,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const counts = {{ charts.met_counts | tojson }};
+            return " " + brl(ctx.raw) + " (" + counts[ctx.dataIndex] + " transações)";
+          }
+        }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById("accChart"), {
+  type: "bar",
+  data: {
+    labels: {{ charts.acc_labels | tojson }},
+    datasets: [{ data: {{ charts.acc_values | tojson }}, backgroundColor: {{ charts.acc_colors | tojson }},
+                 borderRadius: 5, borderSkipped: false }]
+  },
+  options: hbarOptions
+});
+
+new Chart(document.getElementById("subChart"), {
+  type: "bar",
+  data: {
+    labels: {{ charts.sub_labels | tojson }},
+    datasets: [{ data: {{ charts.sub_values | tojson }}, backgroundColor: {{ charts.sub_colors | tojson }},
+                 borderRadius: 5, borderSkipped: false }]
+  },
+  options: hbarOptions
+});
+</script>
+</body>
+</html>
