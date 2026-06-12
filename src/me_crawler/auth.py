@@ -69,6 +69,7 @@ class SessionManager:
         return playwright_cookies
 
     def _save_cookies(self, cookies: list[dict]) -> None:
+        config.COOKIES_FILE.parent.mkdir(parents=True, exist_ok=True)
         config.COOKIES_FILE.write_text(
             json.dumps(cookies, indent=2, ensure_ascii=False), encoding="utf-8"
         )
