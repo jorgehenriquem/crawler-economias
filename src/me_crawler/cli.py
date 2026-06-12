@@ -87,26 +87,36 @@ def cmd_dashboard(args) -> None:
     from me_crawler import dashboard  # import tardio: jinja2 só é necessária aqui
 
     store = TransactionStore()
-    year, month = _parse_month(args.month)
-    transactions = store.get_month(year, month)
 
-    if not transactions:
-        last = store.last_sync()
-        hint = (
-            f"Último sync: {last['at']:%Y-%m-%d %H:%M} ({last['from_date']} a {last['to_date']})."
-            if last
-            else "Nenhum sync registrado ainda."
-        )
-        raise SystemExit(
-            f"Sem transações para {year:04d}-{month:02d} no banco. {hint} Rode: me-crawler sync"
-        )
+    if args.all:
+        transactions = store.get_all()
+        if not transactions:
+            raise SystemExit("Nenhuma transação no banco. Rode: me-crawler sync")
+        title = "Histórico completo"
+        output = Path("dashboard_all.html")
+        dashboard.render(transactions, title, output)
+    else:
+        year, month = _parse_month(args.month)
+        transactions = store.get_month(year, month)
 
-    prev_year, prev_month = _previous_month(year, month)
-    previous = store.get_month(prev_year, prev_month)
+        if not transactions:
+            last = store.last_sync()
+            hint = (
+                f"Último sync: {last['at']:%Y-%m-%d %H:%M} ({last['from_date']} a {last['to_date']})."
+                if last
+                else "Nenhum sync registrado ainda."
+            )
+            raise SystemExit(
+                f"Sem transações para {year:04d}-{month:02d} no banco. {hint} Rode: me-crawler sync"
+            )
 
-    title = f"Mês {year:04d}-{month:02d}"
-    output = Path(f"dashboard_{year:04d}-{month:02d}.html")
-    dashboard.render(transactions, title, output, previous_transactions=previous or None)
+        prev_year, prev_month = _previous_month(year, month)
+        previous = store.get_month(prev_year, prev_month)
+
+        title = f"Mês {year:04d}-{month:02d}"
+        output = Path(f"dashboard_{year:04d}-{month:02d}.html")
+        dashboard.render(transactions, title, output, previous_transactions=previous or None)
+
     print_summary(transactions, title)
 
     if args.open:
@@ -150,6 +160,7 @@ def main() -> None:
 
     p_dash = sub.add_parser("dashboard", help="Gera dashboard HTML a partir do MongoDB")
     p_dash.add_argument("--month", help="Mês no formato YYYY-MM (padrão: mês atual)")
+    p_dash.add_argument("--all", action="store_true", help="Usa todo o histórico disponível no banco")
     p_dash.add_argument("--open", action="store_true", help="Abre o HTML no browser")
     p_dash.set_defaults(func=cmd_dashboard)
 

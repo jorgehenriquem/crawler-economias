@@ -75,6 +75,10 @@ class TransactionStore:
             ).sort("date", -1)
         )
 
+    def get_all(self) -> list[dict]:
+        """Todas as transações disponíveis no banco, sem filtro de data."""
+        return list(self.transactions.find({}, projection={"_id": False}).sort("date", -1))
+
     def get_month(self, year: int, month: int) -> list[dict]:
         import calendar
 
