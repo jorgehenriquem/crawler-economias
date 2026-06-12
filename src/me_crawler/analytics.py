@@ -185,11 +185,13 @@ def dow_weekly_comparison(txs: list[dict]) -> dict | None:
         data["pct_vs_avg"] = round((data["avg"] - overall) / overall * 100, 1) if overall else 0.0
 
     worst = max(dow_stats.items(), key=lambda x: x[1]["avg"])
+    max_avg = worst[1]["avg"]
     return {
         "by_dow": dow_stats,
         "overall_daily_avg": round(overall, 2),
         "most_expensive": worst[0],
         "most_expensive_pct": worst[1]["pct_vs_avg"],
+        "max_avg": max_avg,
     }
 
 
@@ -361,7 +363,7 @@ def open_installments(txs: list[dict]) -> dict | None:
         return None
 
     return {
-        "items": sorted(items, key=lambda x: x["total_remaining"], reverse=True)[:10],
+        "entries": sorted(items, key=lambda x: x["total_remaining"], reverse=True)[:10],
         "total_remaining": round(total_remaining, 2),
         "count": len(items),
     }

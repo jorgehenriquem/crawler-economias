@@ -261,7 +261,7 @@
           </span>
         </div>
         <div class="bar-inline">
-          <div class="bar-fill" style="width:{{ [data.avg / dow.by_dow.values()|map(attribute='avg')|max * 100, 100]|min|round }}%;background:{% if data.pct_vs_avg > 15 %}#ef4444{% elif data.pct_vs_avg > 0 %}#f59e0b{% else %}#10b981{% endif %}"></div>
+          <div class="bar-fill" style="width:{{ [data.avg / dow.max_avg * 100, 100] | min | round | int }}%;background:{% if data.pct_vs_avg > 15 %}#ef4444{% elif data.pct_vs_avg > 0 %}#f59e0b{% else %}#10b981{% endif %}"></div>
         </div>
       </div>
       {% endfor %}
@@ -377,7 +377,7 @@
         <tr><th>Descrição</th><th>Categoria</th><th style="text-align:center">Parcela</th><th style="text-align:right">Restam</th><th style="text-align:right">Valor/mês</th><th style="text-align:right">Total restante</th></tr>
       </thead>
       <tbody>
-        {% for inst in installments.items %}
+        {% for inst in installments.entries %}
         <tr>
           <td class="desc" title="{{ inst.description }}">{{ inst.description | truncate(40) }}</td>
           <td><span class="tag">{{ inst.category }}</span></td>
@@ -593,7 +593,7 @@ new Chart(document.getElementById("monthlyChart"), {
     labels: {{ monthly_chart.labels | tojson }},
     datasets: [{
       label: "Gasto",
-      data: {{ monthly_chart.values | tojson }},
+      data: {{ monthly_chart.data | tojson }},
       backgroundColor: "rgba(139,92,246,.65)",
       borderColor: "#8b5cf6",
       borderWidth: 1.5,

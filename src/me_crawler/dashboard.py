@@ -69,10 +69,10 @@ def _dow_chart_data(dow_result: dict | None) -> dict:
 
 def _monthly_chart_data(pattern: dict | None) -> dict:
     if not pattern:
-        return {"labels": [], "values": []}
+        return {"labels": [], "data": []}
     return {
         "labels": list(pattern["by_day"].keys()),
-        "values": list(pattern["by_day"].values()),
+        "data": list(pattern["by_day"].values()),
     }
 
 
