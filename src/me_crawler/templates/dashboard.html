@@ -98,17 +98,20 @@
   @media (max-width: 600px) { .half-grid { grid-template-columns: 1fr; } }
 
   /* ── FILTER BAR ─────────────────────────────────────────────────────── */
-  #filterBar { background:#fff; border-bottom:1px solid #e2e8f0; padding:12px 20px;
+  #filterBar { background:#fff; border-bottom:1px solid #e2e8f0; padding:10px 20px;
                position:sticky; top:0; z-index:50; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-  .filter-select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 28px 6px 10px;
-                   font-size:.82rem; color:#334155; background:#f8fafc; appearance:none;
-                   outline:none; cursor:pointer; min-width:200px; }
-  .filter-select:focus { border-color:#6366f1; }
-  .filter-badge { background:#ede9fe; color:#7c3aed; font-size:.74rem; font-weight:700;
-                  padding:4px 10px; border-radius:20px; }
-  .filter-clear { background:none; border:1.5px solid #cbd5e1; color:#64748b; padding:5px 12px;
-                  border-radius:8px; cursor:pointer; font-size:.78rem; font-weight:600;
-                  transition:border-color .15s,color .15s; }
+  #filterBar > div { max-width:1280px; margin:0 auto; display:flex; align-items:center;
+                     gap:8px; flex-wrap:wrap; }
+  .filter-label { font-size:.78rem; font-weight:700; color:#64748b; white-space:nowrap; }
+  .cat-chip { border:1.5px solid #e2e8f0; background:#f8fafc; color:#475569;
+              padding:4px 12px; border-radius:20px; cursor:pointer; font-size:.76rem;
+              font-weight:600; transition:border-color .15s,background .15s,color .15s;
+              white-space:nowrap; line-height:1.5; }
+  .cat-chip:hover  { border-color:#6366f1; color:#6366f1; }
+  .cat-chip.active { background:#6366f1; border-color:#6366f1; color:#fff; }
+  .filter-clear { background:none; border:1.5px solid #cbd5e1; color:#64748b; padding:4px 10px;
+                  border-radius:20px; cursor:pointer; font-size:.74rem; font-weight:600;
+                  transition:border-color .15s,color .15s; white-space:nowrap; }
   .filter-clear:hover { border-color:#ef4444; color:#ef4444; }
 
   /* ── PAGINATION ─────────────────────────────────────────────────────── */
@@ -135,15 +138,11 @@
 </div>
 
 <div id="filterBar">
-  <div style="max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-    <span style="font-size:.8rem;font-weight:600;color:#64748b">Categoria:</span>
-    <select id="catFilterSelect" class="filter-select" onchange="setCategoryFilter(this.value)">
-      <option value="">Todas as categorias</option>
-    </select>
-    <span id="filterBadge" class="filter-badge" style="display:none"></span>
-    <button id="filterClear" class="filter-clear" style="display:none"
-      onclick="setCategoryFilter('');document.getElementById('catFilterSelect').value=''">✕ Limpar</button>
+  <div>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" style="flex-shrink:0"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+    <span class="filter-label">Categorias:</span>
+    <div id="catChips" style="display:contents"></div>
+    <button id="filterClear" class="filter-clear" style="display:none" onclick="clearCatFilter()">✕ Limpar</button>
   </div>
 </div>
 
@@ -472,7 +471,7 @@ const ML = {{ method_labels | tojson }};
 const PAGE_SIZE = 10;
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
-let activeCat = null, currentPage = 1, filteredTxs = ALL_TXS;
+let activeCats = new Set(), currentPage = 1, filteredTxs = ALL_TXS;
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const r2   = v => Math.round(v * 100) / 100;
@@ -733,14 +732,13 @@ function renderTop10(top10) {
     : `<tr><td colspan="7" class="empty" style="padding:32px">Nenhum gasto no período filtrado.</td></tr>`;
 }
 
-// ── FILTRO ────────────────────────────────────────────────────────────────────
-function setCategoryFilter(cat) {
-  activeCat    = cat || null;
-  filteredTxs  = activeCat ? ALL_TXS.filter(t => catOf(t) === activeCat) : ALL_TXS;
+// ── FILTRO MULTI-CATEGORIA ────────────────────────────────────────────────────
+function applyFilter() {
+  filteredTxs = activeCats.size > 0
+    ? ALL_TXS.filter(t => activeCats.has(catOf(t)))
+    : ALL_TXS;
 
-  document.getElementById("filterBadge").textContent    = activeCat || "";
-  document.getElementById("filterBadge").style.display  = activeCat ? "" : "none";
-  document.getElementById("filterClear").style.display  = activeCat ? "" : "none";
+  document.getElementById("filterClear").style.display = activeCats.size > 0 ? "" : "none";
 
   const agg = aggregate(filteredTxs);
   updateCharts(agg);
@@ -749,18 +747,36 @@ function setCategoryFilter(cat) {
   renderTop10(agg.top10);
 }
 
+function toggleCat(cat) {
+  if (activeCats.has(cat)) activeCats.delete(cat);
+  else                      activeCats.add(cat);
+
+  document.querySelectorAll(".cat-chip").forEach(
+    chip => chip.classList.toggle("active", activeCats.has(chip.dataset.cat))
+  );
+  applyFilter();
+}
+
+function clearCatFilter() {
+  activeCats.clear();
+  document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
+  applyFilter();
+}
+
 // ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────────
 (function init() {
-  // popula o dropdown com categorias únicas presentes nos dados
-  const cats = [...new Set(ALL_TXS.filter(t => t.type === "GASTO").map(catOf))].sort();
-  const sel  = document.getElementById("catFilterSelect");
+  const cats    = [...new Set(ALL_TXS.filter(t => t.type === "GASTO").map(catOf))].sort();
+  const container = document.getElementById("catChips");
   cats.forEach(c => {
-    const o = document.createElement("option");
-    o.value = c; o.textContent = c;
-    sel.appendChild(o);
+    const btn = document.createElement("button");
+    btn.className    = "cat-chip";
+    btn.dataset.cat  = c;
+    btn.textContent  = c;
+    btn.onclick      = () => toggleCat(c);
+    container.appendChild(btn);
   });
 
-  setCategoryFilter(null); // renderiza tudo com estado inicial (sem filtro)
+  applyFilter(); // renderiza tudo com estado inicial (sem filtro)
 })();
 
 // ── GRÁFICOS ESTÁTICOS (baseados no período completo, não afetados pelo filtro) ──
