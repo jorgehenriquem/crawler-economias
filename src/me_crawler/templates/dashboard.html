@@ -96,6 +96,32 @@
   .bar-inline { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; margin-top: 4px; }
   .bar-fill { height: 100%; border-radius: 3px; background: #6366f1; }
   @media (max-width: 600px) { .half-grid { grid-template-columns: 1fr; } }
+
+  /* ── FILTER BAR ─────────────────────────────────────────────────────── */
+  #filterBar { background:#fff; border-bottom:1px solid #e2e8f0; padding:12px 20px;
+               position:sticky; top:0; z-index:50; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .filter-select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 28px 6px 10px;
+                   font-size:.82rem; color:#334155; background:#f8fafc; appearance:none;
+                   outline:none; cursor:pointer; min-width:200px; }
+  .filter-select:focus { border-color:#6366f1; }
+  .filter-badge { background:#ede9fe; color:#7c3aed; font-size:.74rem; font-weight:700;
+                  padding:4px 10px; border-radius:20px; }
+  .filter-clear { background:none; border:1.5px solid #cbd5e1; color:#64748b; padding:5px 12px;
+                  border-radius:8px; cursor:pointer; font-size:.78rem; font-weight:600;
+                  transition:border-color .15s,color .15s; }
+  .filter-clear:hover { border-color:#ef4444; color:#ef4444; }
+
+  /* ── PAGINATION ─────────────────────────────────────────────────────── */
+  .pagination { display:flex; align-items:center; gap:4px; justify-content:center;
+                padding:16px 14px 4px; flex-wrap:wrap; }
+  .pg-btn { min-width:34px; height:34px; border:1.5px solid #e2e8f0; background:#fff;
+            color:#475569; border-radius:8px; cursor:pointer; font-size:.82rem; font-weight:600;
+            transition:border-color .15s,background .15s,color .15s; }
+  .pg-btn:hover:not(:disabled):not(.active) { border-color:#6366f1; color:#6366f1; }
+  .pg-btn.active { background:#6366f1; border-color:#6366f1; color:#fff; }
+  .pg-btn:disabled { opacity:.4; cursor:default; }
+  .pg-ellipsis { color:#94a3b8; padding:0 2px; line-height:34px; font-size:.85rem; }
+  .pg-info { text-align:center; font-size:.74rem; color:#94a3b8; padding:2px 14px 14px; }
 </style>
 </head>
 <body>
@@ -108,6 +134,19 @@
   <div class="gen">Gerado em {{ generated_at }}<br>{{ a.n_transacoes }} transações analisadas</div>
 </div>
 
+<div id="filterBar">
+  <div style="max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+    <span style="font-size:.8rem;font-weight:600;color:#64748b">Categoria:</span>
+    <select id="catFilterSelect" class="filter-select" onchange="setCategoryFilter(this.value)">
+      <option value="">Todas as categorias</option>
+    </select>
+    <span id="filterBadge" class="filter-badge" style="display:none"></span>
+    <button id="filterClear" class="filter-clear" style="display:none"
+      onclick="setCategoryFilter('');document.getElementById('catFilterSelect').value=''">✕ Limpar</button>
+  </div>
+</div>
+
 <div class="main">
 
   <div class="section-title">Resumo</div>
@@ -115,25 +154,25 @@
     <div class="card">
       <div class="card-accent" style="background:#ef4444"></div>
       <div class="card-label">Total de Gastos</div>
-      <div class="card-value red">{{ a.total_gastos | brl }}</div>
-      <div class="card-sub">{{ a.n_gastos }} transações</div>
+      <div class="card-value red" id="kpiG">{{ a.total_gastos | brl }}</div>
+      <div class="card-sub" id="kpiGn">{{ a.n_gastos }} transações</div>
     </div>
     <div class="card">
       <div class="card-accent" style="background:#10b981"></div>
       <div class="card-label">Total de Ganhos</div>
-      <div class="card-value green">{{ a.total_ganhos | brl }}</div>
-      <div class="card-sub">{{ a.n_ganhos }} transações</div>
+      <div class="card-value green" id="kpiGa">{{ a.total_ganhos | brl }}</div>
+      <div class="card-sub" id="kpiGan">{{ a.n_ganhos }} transações</div>
     </div>
     <div class="card">
       <div class="card-accent" style="background:{{ resultado_color }}"></div>
       <div class="card-label">Resultado</div>
-      <div class="card-value" style="color:{{ resultado_color }}">{{ resultado_sign }}{{ a.resultado | brl }}</div>
+      <div class="card-value" id="kpiR" style="color:{{ resultado_color }}">{{ resultado_sign }}{{ a.resultado | brl }}</div>
       <div class="card-sub">{{ "saldo positivo 🎉" if a.resultado >= 0 else "no vermelho ⚠️" }}</div>
     </div>
     <div class="card">
       <div class="card-accent" style="background:#6366f1"></div>
       <div class="card-label">Ticket Médio</div>
-      <div class="card-value indigo">{{ a.ticket_medio | brl }}</div>
+      <div class="card-value indigo" id="kpiT">{{ a.ticket_medio | brl }}</div>
       <div class="card-sub">por gasto</div>
     </div>
     {% if comparison %}
@@ -396,106 +435,125 @@
   {% if a.recent %}
   <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
     <span>Últimas Transações</span>
-    <span style="font-size:.75rem;font-weight:500;color:#94a3b8">{{ a.recent | length }} no período</span>
+    <span style="font-size:.75rem;font-weight:500;color:#94a3b8" id="recentCount">{{ a.recent | length }} no período</span>
   </div>
   <div class="table-card">
     <table id="recentTable">
       <thead>
         <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Método</th><th style="text-align:right">Tipo</th><th style="text-align:right">Valor</th></tr>
       </thead>
-      <tbody>
-        {% for t in a.recent %}
-        <tr class="recent-row" {% if loop.index > 20 %}style="display:none"{% endif %}>
-          <td class="mono">{{ t.date }}</td>
-          <td class="desc" title="{{ t.description }}">{{ t.description | truncate(45) }}</td>
-          <td><span class="tag">{{ (t.category or {}).get("categoryName", "—") }}</span></td>
-          <td>{{ (t.account or {}).get("name", "—") }}</td>
-          <td>{{ method_labels.get(t.paymentMethod, t.paymentMethod or "—") }}</td>
-          <td style="text-align:right">
-            <span style="font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:4px;
-              background:{% if t.type == 'GANHO' %}#d1fae5{% else %}#fee2e2{% endif %};
-              color:{% if t.type == 'GANHO' %}#065f46{% else %}#991b1b{% endif %}">
-              {{ t.type }}
-            </span>
-          </td>
-          <td class="val-cell" style="color:{% if t.type == 'GANHO' %}#10b981{% else %}#ef4444{% endif %}">
-            {{ t.value | brl }}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="recentBody"></tbody>
     </table>
-    {% if a.recent | length > 20 %}
-    <div style="text-align:center;margin-top:14px">
-      <button id="recentToggle" onclick="toggleRecent()" style="
-        background:none;border:1.5px solid #6366f1;color:#6366f1;
-        padding:6px 20px;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:600">
-        Ver mais ({{ a.recent | length - 20 }} ocultas)
-      </button>
-    </div>
-    {% endif %}
+    <div id="recentPagination"></div>
   </div>
   {% endif %}
 
   <div class="section-title">Top 10 Maiores Gastos</div>
-  {% if a.top10 %}
   <div class="table-card">
     <table>
       <thead>
         <tr><th></th><th>Descrição</th><th>Categoria</th><th>Data</th><th>Conta</th><th>Método</th><th style="text-align:right">Valor</th></tr>
       </thead>
-      <tbody>
-        {% for t in a.top10 %}
-        <tr>
-          <td class="rank">#{{ loop.index }}</td>
-          <td class="desc" title="{{ t.description }}">{{ t.description | truncate(45) }}</td>
-          <td><span class="tag">{{ (t.category or {}).get("categoryName", "—") }}</span></td>
-          <td class="mono">{{ t.date }}</td>
-          <td>{{ (t.account or {}).get("name", "—") }}</td>
-          <td>{{ method_labels.get(t.paymentMethod, t.paymentMethod or "—") }}</td>
-          <td class="val-cell">{{ t.value | brl }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="top10Body"></tbody>
     </table>
   </div>
-  {% else %}
-  <div class="empty">Nenhuma transação de gasto no período.</div>
-  {% endif %}
 
 </div>
 
 <script>
-function toggleRecent() {
-  const rows = document.querySelectorAll(".recent-row");
-  const btn = document.getElementById("recentToggle");
-  const hidden = [...rows].filter(r => r.style.display === "none");
-  if (hidden.length) {
-    hidden.forEach(r => r.style.display = "");
-    btn.textContent = "Ver menos";
-  } else {
-    rows.forEach((r, i) => { if (i >= 20) r.style.display = "none"; });
-    btn.textContent = "Ver mais (" + (rows.length - 20) + " ocultas)";
-    document.getElementById("recentTable").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+// ── DADOS BRUTOS ──────────────────────────────────────────────────────────────
+const ALL_TXS = {{ a.recent | tojson }};
+
+// ── CONSTANTES ────────────────────────────────────────────────────────────────
+const COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6",
+                "#f97316","#14b8a6","#ec4899","#84cc16","#06b6d4","#a855f7",
+                "#f43f5e","#22c55e","#eab308"];
+const ML = {{ method_labels | tojson }};
+const PAGE_SIZE = 10;
+
+// ── ESTADO ────────────────────────────────────────────────────────────────────
+let activeCat = null, currentPage = 1, filteredTxs = ALL_TXS;
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const r2   = v => Math.round(v * 100) / 100;
+const brl  = v => "R$ " + Math.abs(v).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const catOf    = t => t.category?.categoryName ?? "Outros";
+const subcatOf = t => t.subCategory?.subCategoryName ?? catOf(t);
+const mlOf     = m => ML[m] ?? m ?? "—";
+const esc      = s => String(s ?? "—").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+// ── AGREGAÇÃO ─────────────────────────────────────────────────────────────────
+function aggregate(txs) {
+  const gastos = txs.filter(t => t.type === "GASTO");
+  const ganhos = txs.filter(t => t.type === "GANHO");
+  const totalG  = gastos.reduce((s, t) => s + t.value, 0);
+  const totalGa = ganhos.reduce((s, t) => s + t.value, 0);
+
+  // por categoria
+  const catMap = {};
+  gastos.forEach(t => { const c = catOf(t); catMap[c] = (catMap[c] || 0) + t.value; });
+  const catE = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+
+  // por dia
+  const dG = {}, dGa = {};
+  gastos.forEach(t => { dG[t.date]  = (dG[t.date]  || 0) + t.value; });
+  ganhos.forEach(t => { dGa[t.date] = (dGa[t.date] || 0) + t.value; });
+  const days = Object.keys(dG).sort();
+  const dlyG  = days.map(d => r2(dG[d]));
+  const dlyGa = days.map(d => r2(dGa[d] || 0));
+
+  let run = 0;
+  const cum = dlyG.map(v => r2(run += v));
+  const ma7 = dlyG.map((_, i) => {
+    const w = dlyG.slice(Math.max(0, i - 6), i + 1);
+    return r2(w.reduce((a, b) => a + b, 0) / w.length);
+  });
+
+  // por método
+  const metMap = {};
+  gastos.forEach(t => {
+    const m = t.paymentMethod || "OUTRO";
+    if (!metMap[m]) metMap[m] = { count: 0, total: 0 };
+    metMap[m].count++;
+    metMap[m].total = r2(metMap[m].total + t.value);
+  });
+  const metE = Object.entries(metMap).sort((a, b) => b[1].total - a[1].total);
+
+  // por conta e subcategoria
+  const accMap = {}, subMap = {};
+  gastos.forEach(t => {
+    const a = t.account?.name || "Sem conta";
+    accMap[a] = (accMap[a] || 0) + t.value;
+    const s = subcatOf(t);
+    subMap[s] = (subMap[s] || 0) + t.value;
+  });
+  const accE = Object.entries(accMap).sort((a, b) => b[1] - a[1]);
+  const subE = Object.entries(subMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const top10 = [...gastos].sort((a, b) => b.value - a.value).slice(0, 10);
+
+  return { totalG, totalGa, nG: gastos.length, nGa: ganhos.length,
+           ticket: gastos.length ? totalG / gastos.length : 0,
+           catE, days, dlyG, dlyGa, cum, ma7, metE, accE, subE, top10 };
+}
+
+// ── REGISTRO DE GRÁFICOS ──────────────────────────────────────────────────────
+const C = {};
+
+function setData(chart, labels, ...datasets) {
+  chart.data.labels = labels;
+  datasets.forEach((ds, i) => Object.assign(chart.data.datasets[i], ds));
+  chart.update("none");
 }
 
 Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 Chart.defaults.color = "#64748b";
 
-const brl = v => "R$ " + Math.abs(v).toFixed(2)
-  .replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-
-new Chart(document.getElementById("catChart"), {
+C.cat = new Chart(document.getElementById("catChart"), {
   type: "doughnut",
-  data: {
-    labels: {{ charts.cat_labels | tojson }},
-    datasets: [{ data: {{ charts.cat_values | tojson }}, backgroundColor: {{ charts.cat_colors | tojson }},
-                 borderWidth: 2, borderColor: "#fff", hoverOffset: 6 }]
-  },
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: "#fff", hoverOffset: 6 }] },
   options: {
-    responsive: true, maintainAspectRatio: false,
-    cutout: "62%",
+    responsive: true, maintainAspectRatio: false, cutout: "62%",
     plugins: {
       legend: { position: "right", labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
       tooltip: { callbacks: { label: ctx => " " + ctx.label + ": " + brl(ctx.raw) } }
@@ -503,25 +561,20 @@ new Chart(document.getElementById("catChart"), {
   }
 });
 
-new Chart(document.getElementById("dayChart"), {
+C.day = new Chart(document.getElementById("dayChart"), {
   data: {
-    labels: {{ charts.day_labels | tojson }},
+    labels: [],
     datasets: [
-      { type: "bar", label: "Gastos", data: {{ charts.day_gastos | tojson }}, backgroundColor: "#fca5a5",
-        borderColor: "#ef4444", borderWidth: 1.5, borderRadius: 4 },
-      { type: "bar", label: "Ganhos", data: {{ charts.day_ganhos | tojson }}, backgroundColor: "#6ee7b7",
-        borderColor: "#10b981", borderWidth: 1.5, borderRadius: 4 },
-      { type: "line", label: "Média móvel 7d", data: {{ charts.ma7 | tojson }},
-        borderColor: "#6366f1", borderWidth: 2, borderDash: [6, 3],
-        pointRadius: 0, tension: 0.4, fill: false }
+      { type: "bar",  label: "Gastos",         data: [], backgroundColor: "#fca5a5", borderColor: "#ef4444", borderWidth: 1.5, borderRadius: 4 },
+      { type: "bar",  label: "Ganhos",          data: [], backgroundColor: "#6ee7b7", borderColor: "#10b981", borderWidth: 1.5, borderRadius: 4 },
+      { type: "line", label: "Média móvel 7d",  data: [], borderColor: "#6366f1", borderWidth: 2, borderDash: [6, 3], pointRadius: 0, tension: 0.4, fill: false }
     ]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-      y: { grid: { color: "#f1f5f9" },
-           ticks: { callback: v => "R$" + (v/1000).toFixed(1) + "k", font: { size: 10 } } }
+      y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => "R$" + (v / 1000).toFixed(1) + "k", font: { size: 10 } } }
     },
     plugins: {
       legend: { labels: { boxWidth: 10, font: { size: 11 } } },
@@ -530,117 +583,201 @@ new Chart(document.getElementById("dayChart"), {
   }
 });
 
-new Chart(document.getElementById("cumChart"), {
+C.cum = new Chart(document.getElementById("cumChart"), {
   type: "line",
-  data: {
-    labels: {{ charts.day_labels | tojson }},
-    datasets: [{
-      label: "Gasto acumulado",
-      data: {{ charts.cumulative | tojson }},
-      borderColor: "#6366f1",
-      backgroundColor: "rgba(99,102,241,.10)",
-      fill: true,
-      tension: 0.4,
-      pointRadius: 4,
-      pointBackgroundColor: "#6366f1",
-      pointBorderColor: "#fff",
-      pointBorderWidth: 2
-    }]
-  },
+  data: { labels: [], datasets: [{ label: "Gasto acumulado", data: [], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,.10)", fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: "#6366f1", pointBorderColor: "#fff", pointBorderWidth: 2 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-      y: { grid: { color: "#f1f5f9" },
-           ticks: { callback: v => brl(v), font: { size: 10 } } }
+      y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => brl(v), font: { size: 10 } } }
     },
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: ctx => " Acumulado: " + brl(ctx.raw) } }
-    }
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " Acumulado: " + brl(ctx.raw) } } }
   }
 });
 
-const hbarOptions = {
-  indexAxis: "y",
-  responsive: true, maintainAspectRatio: false,
+const hbar = {
+  indexAxis: "y", responsive: true, maintainAspectRatio: false,
   scales: {
     x: { grid: { color: "#f1f5f9" }, ticks: { callback: v => brl(v), font: { size: 9 } } },
     y: { grid: { display: false }, ticks: { font: { size: 10 } } }
   },
-  plugins: {
-    legend: { display: false },
-    tooltip: { callbacks: { label: ctx => " " + brl(ctx.raw) } }
-  }
+  plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + brl(ctx.raw) } } }
 };
 
-new Chart(document.getElementById("metChart"), {
+C.met = new Chart(document.getElementById("metChart"), {
   type: "bar",
-  data: {
-    labels: {{ charts.met_labels | tojson }},
-    datasets: [{ data: {{ charts.met_values | tojson }}, backgroundColor: {{ charts.met_colors | tojson }},
-                 borderRadius: 5, borderSkipped: false }]
-  },
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 5, borderSkipped: false }] },
   options: {
-    ...hbarOptions,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: ctx => {
-            const counts = {{ charts.met_counts | tojson }};
-            return " " + brl(ctx.raw) + " (" + counts[ctx.dataIndex] + " transações)";
-          }
-        }
-      }
+    ...hbar,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => {
+        const n = (C.met._counts || [])[ctx.dataIndex];
+        return " " + brl(ctx.raw) + (n !== undefined ? " (" + n + " transações)" : "");
+      }}}
     }
   }
 });
 
-new Chart(document.getElementById("accChart"), {
+C.acc = new Chart(document.getElementById("accChart"), {
   type: "bar",
-  data: {
-    labels: {{ charts.acc_labels | tojson }},
-    datasets: [{ data: {{ charts.acc_values | tojson }}, backgroundColor: {{ charts.acc_colors | tojson }},
-                 borderRadius: 5, borderSkipped: false }]
-  },
-  options: hbarOptions
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 5, borderSkipped: false }] },
+  options: hbar
 });
 
-new Chart(document.getElementById("subChart"), {
+C.sub = new Chart(document.getElementById("subChart"), {
   type: "bar",
-  data: {
-    labels: {{ charts.sub_labels | tojson }},
-    datasets: [{ data: {{ charts.sub_values | tojson }}, backgroundColor: {{ charts.sub_colors | tojson }},
-                 borderRadius: 5, borderSkipped: false }]
-  },
-  options: hbarOptions
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 5, borderSkipped: false }] },
+  options: hbar
 });
 
+// ── ATUALIZAÇÃO DOS GRÁFICOS ──────────────────────────────────────────────────
+function updateCharts(agg) {
+  setData(C.cat, agg.catE.map(e => e[0]),  { data: agg.catE.map(e => r2(e[1])), backgroundColor: COLORS.slice(0, agg.catE.length) });
+  setData(C.day, agg.days, { data: agg.dlyG }, { data: agg.dlyGa }, { data: agg.ma7 });
+  setData(C.cum, agg.days, { data: agg.cum });
+  C.met._counts = agg.metE.map(e => e[1].count);
+  setData(C.met, agg.metE.map(e => mlOf(e[0])), { data: agg.metE.map(e => r2(e[1].total)), backgroundColor: COLORS.slice(1, 1 + agg.metE.length) });
+  setData(C.acc, agg.accE.map(e => e[0]),        { data: agg.accE.map(e => r2(e[1])),       backgroundColor: COLORS.slice(4, 4 + agg.accE.length) });
+  setData(C.sub, agg.subE.map(e => e[0]),        { data: agg.subE.map(e => r2(e[1])),       backgroundColor: COLORS.slice(2, 2 + agg.subE.length) });
+}
+
+// ── ATUALIZAÇÃO DOS KPIs ──────────────────────────────────────────────────────
+function updateKPIs(agg) {
+  document.getElementById("kpiG").textContent  = brl(agg.totalG);
+  document.getElementById("kpiGn").textContent = agg.nG + " transações";
+  document.getElementById("kpiGa").textContent  = brl(agg.totalGa);
+  document.getElementById("kpiGan").textContent = agg.nGa + " transações";
+  const res = agg.totalGa - agg.totalG;
+  const el = document.getElementById("kpiR");
+  el.textContent  = (res >= 0 ? "+" : "−") + brl(Math.abs(res));
+  el.style.color  = res >= 0 ? "#10b981" : "#ef4444";
+  document.getElementById("kpiT").textContent = brl(agg.ticket);
+}
+
+// ── PAGINAÇÃO ─────────────────────────────────────────────────────────────────
+function renderPagination() {
+  const total      = filteredTxs.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const el         = document.getElementById("recentPagination");
+
+  if (totalPages <= 1) {
+    el.innerHTML = `<div class="pg-info">${total} transação(ões)</div>`;
+    return;
+  }
+
+  // gera lista de páginas com elipses
+  const pages = [];
+  pages.push(1);
+  if (currentPage > 3) pages.push(null);
+  for (let p = Math.max(2, currentPage - 1); p <= Math.min(totalPages - 1, currentPage + 1); p++) pages.push(p);
+  if (currentPage < totalPages - 2) pages.push(null);
+  if (totalPages > 1) pages.push(totalPages);
+
+  const btn = (p, label, disabled, active) =>
+    `<button class="pg-btn${active ? " active" : ""}" ${disabled ? "disabled" : ""} onclick="renderRecent(${p})">${label}</button>`;
+
+  const start = (currentPage - 1) * PAGE_SIZE + 1;
+  const end   = Math.min(currentPage * PAGE_SIZE, total);
+
+  el.innerHTML = `
+    <div class="pagination">
+      ${btn(currentPage - 1, "‹", currentPage === 1, false)}
+      ${pages.map(p => p === null
+          ? '<span class="pg-ellipsis">…</span>'
+          : btn(p, p, false, p === currentPage)).join("")}
+      ${btn(currentPage + 1, "›", currentPage === totalPages, false)}
+    </div>
+    <div class="pg-info">Mostrando ${start}–${end} de ${total} transações</div>`;
+}
+
+// ── RENDER DAS TABELAS ────────────────────────────────────────────────────────
+function renderRecent(page) {
+  currentPage = page;
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = filteredTxs.slice(start, start + PAGE_SIZE);
+
+  document.getElementById("recentBody").innerHTML = slice.map(t => `
+    <tr>
+      <td class="mono">${esc(t.date)}</td>
+      <td class="desc" title="${esc(t.description)}">${esc((t.description || "—").slice(0, 45))}</td>
+      <td><span class="tag">${esc(catOf(t))}</span></td>
+      <td>${esc(t.account?.name || "—")}</td>
+      <td>${esc(mlOf(t.paymentMethod))}</td>
+      <td style="text-align:right">
+        <span style="font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:4px;
+          background:${t.type === "GANHO" ? "#d1fae5" : "#fee2e2"};
+          color:${t.type === "GANHO" ? "#065f46" : "#991b1b"}">${t.type}</span>
+      </td>
+      <td class="val-cell" style="color:${t.type === "GANHO" ? "#10b981" : "#ef4444"}">${brl(t.value)}</td>
+    </tr>`).join("");
+
+  renderPagination();
+
+  const countEl = document.getElementById("recentCount");
+  if (countEl) countEl.textContent = filteredTxs.length + " no período";
+}
+
+function renderTop10(top10) {
+  document.getElementById("top10Body").innerHTML = top10.length
+    ? top10.map((t, i) => `
+        <tr>
+          <td class="rank">#${i + 1}</td>
+          <td class="desc" title="${esc(t.description)}">${esc((t.description || "—").slice(0, 45))}</td>
+          <td><span class="tag">${esc(catOf(t))}</span></td>
+          <td class="mono">${esc(t.date)}</td>
+          <td>${esc(t.account?.name || "—")}</td>
+          <td>${esc(mlOf(t.paymentMethod))}</td>
+          <td class="val-cell">${brl(t.value)}</td>
+        </tr>`).join("")
+    : `<tr><td colspan="7" class="empty" style="padding:32px">Nenhum gasto no período filtrado.</td></tr>`;
+}
+
+// ── FILTRO ────────────────────────────────────────────────────────────────────
+function setCategoryFilter(cat) {
+  activeCat    = cat || null;
+  filteredTxs  = activeCat ? ALL_TXS.filter(t => catOf(t) === activeCat) : ALL_TXS;
+
+  document.getElementById("filterBadge").textContent    = activeCat || "";
+  document.getElementById("filterBadge").style.display  = activeCat ? "" : "none";
+  document.getElementById("filterClear").style.display  = activeCat ? "" : "none";
+
+  const agg = aggregate(filteredTxs);
+  updateCharts(agg);
+  updateKPIs(agg);
+  renderRecent(1);
+  renderTop10(agg.top10);
+}
+
+// ── INICIALIZAÇÃO ─────────────────────────────────────────────────────────────
+(function init() {
+  // popula o dropdown com categorias únicas presentes nos dados
+  const cats = [...new Set(ALL_TXS.filter(t => t.type === "GASTO").map(catOf))].sort();
+  const sel  = document.getElementById("catFilterSelect");
+  cats.forEach(c => {
+    const o = document.createElement("option");
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+
+  setCategoryFilter(null); // renderiza tudo com estado inicial (sem filtro)
+})();
+
+// ── GRÁFICOS ESTÁTICOS (baseados no período completo, não afetados pelo filtro) ──
 {% if dow_chart and dow_chart.labels %}
 new Chart(document.getElementById("dowChart"), {
   type: "bar",
   data: {
     labels: {{ dow_chart.labels | tojson }},
-    datasets: [{
-      label: "Gasto médio",
-      data: {{ dow_chart.avgs | tojson }},
-      backgroundColor: {{ dow_chart.colors | tojson }},
-      borderRadius: 6,
-      borderSkipped: false
-    }]
+    datasets: [{ label: "Gasto médio", data: {{ dow_chart.avgs | tojson }}, backgroundColor: {{ dow_chart.colors | tojson }}, borderRadius: 6, borderSkipped: false }]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-      y: { grid: { color: "#f1f5f9" },
-           ticks: { callback: v => "R$" + (v/1000).toFixed(1) + "k", font: { size: 10 } } }
+      y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => "R$" + (v / 1000).toFixed(1) + "k", font: { size: 10 } } }
     },
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: ctx => " Média: " + brl(ctx.raw) } }
-    }
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " Média: " + brl(ctx.raw) } } }
   }
 });
 {% endif %}
@@ -650,27 +787,15 @@ new Chart(document.getElementById("monthlyChart"), {
   type: "bar",
   data: {
     labels: {{ monthly_chart.labels | tojson }},
-    datasets: [{
-      label: "Gasto",
-      data: {{ monthly_chart.data | tojson }},
-      backgroundColor: "rgba(139,92,246,.65)",
-      borderColor: "#8b5cf6",
-      borderWidth: 1.5,
-      borderRadius: 4,
-      borderSkipped: false
-    }]
+    datasets: [{ label: "Gasto", data: {{ monthly_chart.data | tojson }}, backgroundColor: "rgba(139,92,246,.65)", borderColor: "#8b5cf6", borderWidth: 1.5, borderRadius: 4, borderSkipped: false }]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-      y: { grid: { color: "#f1f5f9" },
-           ticks: { callback: v => brl(v), font: { size: 10 } } }
+      y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => brl(v), font: { size: 10 } } }
     },
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: ctx => " Dia " + ctx.label + ": " + brl(ctx.raw) } }
-    }
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " Dia " + ctx.label + ": " + brl(ctx.raw) } } }
   }
 });
 {% endif %}
