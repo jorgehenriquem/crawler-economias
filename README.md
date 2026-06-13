@@ -65,13 +65,20 @@ tests/
 Gerado a partir dos dados do MongoDB, inclui:
 
 - Resumo de gastos, ganhos e resultado do período
+- **Filtro por categoria** na barra fixa do topo — atualiza todos os 6 gráficos, KPIs e tabelas em tempo real
 - Comparação percentual com o mês anterior por categoria
 - Distribuição de gastos por categoria (donut)
 - Gastos vs ganhos por dia com média móvel de 7 dias
 - Curva de gasto acumulado
 - Detalhamento por forma de pagamento, conta e subcategoria
-- Insights: dia mais caro, categoria campeã, dia da semana com mais gastos, projeção de 30 dias
-- Top 10 maiores gastos
+- Padrão de gasto por dia da semana (últimas 4 ocorrências de cada dia)
+- Distribuição dos gastos ao longo do mês (1ª vs 2ª quinzena)
+- Top fornecedores por volume total gasto
+- Parcelas em aberto e total comprometido
+- Possíveis cobranças duplicadas (mesmo valor + categoria em ≤ 3 dias)
+- Insights: dia mais caro, categoria campeã, dia da semana mais caro, projeção de 30 dias
+- Últimas transações com **paginação numerada** (10 por página) e navegação por elipses
+- Top 10 maiores gastos (atualizado pelo filtro de categoria)
 
 ## Testes
 
