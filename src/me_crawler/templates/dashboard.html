@@ -795,13 +795,10 @@ function clearAllFilters() {
     container.appendChild(btn);
   });
 
-  const dates = ALL_TXS.map(t => t.date).filter(Boolean).sort();
   fpInstance = flatpickr("#periodPicker", {
     mode: "range",
     dateFormat: "d/m/Y",
     locale: "pt",
-    minDate: dates[0]              || null,
-    maxDate: dates[dates.length-1] || null,
     onChange(selectedDates) {
       dateFrom = selectedDates[0] ? selectedDates[0].toISOString().slice(0, 10) : "";
       dateTo   = selectedDates[1] ? selectedDates[1].toISOString().slice(0, 10) : "";
