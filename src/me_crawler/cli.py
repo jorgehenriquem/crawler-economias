@@ -6,9 +6,11 @@ Comandos:
   me-crawler sync [--days 30]               busca transações → MongoDB
   me-crawler dashboard [--month YYYY-MM] [--open]
   me-crawler export [--month YYYY-MM] [--format csv|json|both]
+  me-crawler show [--days 7]                imprime JSON reduzido no stdout
 """
 
 import argparse
+import json
 import logging
 import shutil
 import subprocess
@@ -154,6 +156,26 @@ def cmd_export(args) -> None:
         save_csv(transactions, config.OUTPUT_DIR / f"{stem}.csv")
 
 
+def cmd_show(args) -> None:
+    store = TransactionStore()
+    to_date = date.today()
+    from_date = to_date - timedelta(days=args.days)
+    transactions = store.get_range(from_date.isoformat(), to_date.isoformat())
+
+    rows = [
+        {
+            "date": t.get("date"),
+            "description": t.get("description"),
+            "value": t.get("value"),
+            "category": (t.get("category") or {}).get("categoryName"),
+            "subCategory": (t.get("subCategory") or {}).get("subCategoryName"),
+            "type": t.get("type"),
+        }
+        for t in transactions
+    ]
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="me-crawler",
@@ -182,6 +204,15 @@ def main() -> None:
     p_exp.add_argument("--month", help="Mês no formato YYYY-MM (padrão: mês atual)")
     p_exp.add_argument("--format", choices=["csv", "json", "both"], default="both")
     p_exp.set_defaults(func=cmd_export)
+
+    p_show = sub.add_parser("show", help="Imprime transações dos últimos N dias em JSON no stdout")
+    p_show.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Número de dias para trás (padrão: 7)",
+    )
+    p_show.set_defaults(func=cmd_show)
 
     args = parser.parse_args()
     try:

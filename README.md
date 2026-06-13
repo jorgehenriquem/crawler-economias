@@ -31,6 +31,8 @@ me-crawler dashboard --open                # dashboard do mês atual no browser
 me-crawler dashboard --month 2026-05       # mês específico
 me-crawler export --month 2026-06          # exporta CSV + JSON
 me-crawler export --format csv             # só CSV
+me-crawler show --days 7                   # últimos 7 dias → JSON no stdout
+me-crawler show --days 30                  # últimos 30 dias → JSON no stdout
 ```
 
 No Windows, o `run.bat` encapsula tudo via WSL:
