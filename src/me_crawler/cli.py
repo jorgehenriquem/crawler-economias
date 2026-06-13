@@ -61,26 +61,38 @@ def cmd_login(_args) -> None:
 
 
 def cmd_sync(args) -> None:
-    store = TransactionStore()
     to_date = date.today()
     from_date = to_date - timedelta(days=args.days)
+    period = f"{from_date.isoformat()} a {to_date.isoformat()}"
 
-    log.info("Sincronizando %s a %s...", from_date.isoformat(), to_date.isoformat())
+    store: TransactionStore | None = None
+    try:
+        store = TransactionStore()
+    except StoreUnavailableError as exc:
+        log.warning("MongoDB indisponível — dados NÃO serão gravados. (%s)", exc)
+
+    log.info("Sincronizando %s...", period)
     client = ApiClient()
     transactions = client.get_transactions(
         from_date=from_date.isoformat(), to_date=to_date.isoformat()
     )
 
-    counts = store.upsert_transactions(transactions)
-    store.record_sync(from_date.isoformat(), to_date.isoformat(), counts)
+    if store is not None:
+        try:
+            counts = store.upsert_transactions(transactions)
+            store.record_sync(from_date.isoformat(), to_date.isoformat(), counts)
+            log.info(
+                "Gravado no banco: %d buscadas, %d novas, %d atualizadas.",
+                counts["fetched"],
+                counts["new"],
+                counts["updated"],
+            )
+        except Exception as exc:
+            log.warning("Erro ao gravar no banco — dados NÃO persistidos. (%s)", exc)
+    else:
+        log.warning("⚠  Dados exibidos abaixo mas NÃO gravados no banco.")
 
-    log.info(
-        "Sync concluído: %d buscadas, %d novas, %d atualizadas.",
-        counts["fetched"],
-        counts["new"],
-        counts["updated"],
-    )
-    print_summary(transactions, f"{from_date.isoformat()} a {to_date.isoformat()}")
+    print_summary(transactions, period)
 
 
 def cmd_dashboard(args) -> None:
@@ -173,7 +185,7 @@ def main() -> None:
     try:
         args.func(args)
     except StoreUnavailableError as exc:
-        log.error("%s", exc)
+        log.error("MongoDB indisponível (necessário para este comando): %s", exc)
         sys.exit(2)
 
 
