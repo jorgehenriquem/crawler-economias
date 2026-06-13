@@ -120,6 +120,7 @@ def analyze(txs: list[dict]) -> dict:
             pass
 
     top10 = sorted(gastos, key=lambda x: x["value"], reverse=True)[:10]
+    recent = sorted(active, key=lambda x: x.get("date", ""), reverse=True)
 
     return {
         "total_gastos": total_gastos,
@@ -144,6 +145,7 @@ def analyze(txs: list[dict]) -> dict:
         "by_account": by_account,
         "by_subcat": by_subcat,
         "top10": top10,
+        "recent": recent,
     }
 
 

@@ -392,6 +392,51 @@
   </div>
   {% endif %}
 
+  <!-- ── ÚLTIMAS TRANSAÇÕES ─────────────────────────────────────────── -->
+  {% if a.recent %}
+  <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+    <span>Últimas Transações</span>
+    <span style="font-size:.75rem;font-weight:500;color:#94a3b8">{{ a.recent | length }} no período</span>
+  </div>
+  <div class="table-card">
+    <table id="recentTable">
+      <thead>
+        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Método</th><th style="text-align:right">Tipo</th><th style="text-align:right">Valor</th></tr>
+      </thead>
+      <tbody>
+        {% for t in a.recent %}
+        <tr class="recent-row" {% if loop.index > 20 %}style="display:none"{% endif %}>
+          <td class="mono">{{ t.date }}</td>
+          <td class="desc" title="{{ t.description }}">{{ t.description | truncate(45) }}</td>
+          <td><span class="tag">{{ (t.category or {}).get("categoryName", "—") }}</span></td>
+          <td>{{ (t.account or {}).get("name", "—") }}</td>
+          <td>{{ method_labels.get(t.paymentMethod, t.paymentMethod or "—") }}</td>
+          <td style="text-align:right">
+            <span style="font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:4px;
+              background:{% if t.type == 'GANHO' %}#d1fae5{% else %}#fee2e2{% endif %};
+              color:{% if t.type == 'GANHO' %}#065f46{% else %}#991b1b{% endif %}">
+              {{ t.type }}
+            </span>
+          </td>
+          <td class="val-cell" style="color:{% if t.type == 'GANHO' %}#10b981{% else %}#ef4444{% endif %}">
+            {{ t.value | brl }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if a.recent | length > 20 %}
+    <div style="text-align:center;margin-top:14px">
+      <button id="recentToggle" onclick="toggleRecent()" style="
+        background:none;border:1.5px solid #6366f1;color:#6366f1;
+        padding:6px 20px;border-radius:6px;cursor:pointer;font-size:.82rem;font-weight:600">
+        Ver mais ({{ a.recent | length - 20 }} ocultas)
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="section-title">Top 10 Maiores Gastos</div>
   {% if a.top10 %}
   <div class="table-card">
@@ -421,6 +466,20 @@
 </div>
 
 <script>
+function toggleRecent() {
+  const rows = document.querySelectorAll(".recent-row");
+  const btn = document.getElementById("recentToggle");
+  const hidden = [...rows].filter(r => r.style.display === "none");
+  if (hidden.length) {
+    hidden.forEach(r => r.style.display = "");
+    btn.textContent = "Ver menos";
+  } else {
+    rows.forEach((r, i) => { if (i >= 20) r.style.display = "none"; });
+    btn.textContent = "Ver mais (" + (rows.length - 20) + " ocultas)";
+    document.getElementById("recentTable").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
 Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 Chart.defaults.color = "#64748b";
 
