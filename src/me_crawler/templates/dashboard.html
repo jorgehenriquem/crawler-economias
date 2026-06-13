@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard · {{ title }}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/pt.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -113,11 +116,11 @@
                   border-radius:20px; cursor:pointer; font-size:.74rem; font-weight:600;
                   transition:border-color .15s,color .15s; white-space:nowrap; }
   .filter-clear:hover { border-color:#ef4444; color:#ef4444; }
-  .filter-sep  { color:#cbd5e1; font-size:1.1rem; padding:0 2px; flex-shrink:0; }
-  .date-input  { border:1.5px solid #e2e8f0; background:#f8fafc; color:#475569;
-                 padding:4px 8px; border-radius:8px; font-size:.76rem; font-weight:500;
-                 cursor:pointer; outline:none; transition:border-color .15s; }
-  .date-input:hover, .date-input:focus { border-color:#6366f1; }
+  .filter-sep    { color:#cbd5e1; font-size:1.1rem; padding:0 2px; flex-shrink:0; }
+  .period-input  { border:1.5px solid #e2e8f0; background:#f8fafc; color:#475569;
+                   padding:4px 10px; border-radius:8px; font-size:.76rem; font-weight:500;
+                   cursor:pointer; outline:none; transition:border-color .15s; min-width:190px; }
+  .period-input:hover, .period-input:focus { border-color:#6366f1; }
 
   /* ── PAGINATION ─────────────────────────────────────────────────────── */
   .pagination { display:flex; align-items:center; gap:4px; justify-content:center;
@@ -150,9 +153,7 @@
     <span class="filter-sep">|</span>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <span class="filter-label">Período:</span>
-    <input type="date" id="inputFrom" class="date-input" oninput="setDateFrom(this.value)">
-    <span style="font-size:.76rem;color:#94a3b8">até</span>
-    <input type="date" id="inputTo" class="date-input" oninput="setDateTo(this.value)">
+    <input type="text" id="periodPicker" class="period-input" placeholder="Selecionar período…" readonly>
     <button id="filterClear" class="filter-clear" style="display:none" onclick="clearAllFilters()">✕ Limpar</button>
   </div>
 </div>
@@ -483,7 +484,7 @@ const PAGE_SIZE = 10;
 
 // ── ESTADO ────────────────────────────────────────────────────────────────────
 let activeCats = new Set(), currentPage = 1, filteredTxs = ALL_TXS;
-let dateFrom = "", dateTo = "";
+let dateFrom = "", dateTo = "", fpInstance;
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const r2   = v => Math.round(v * 100) / 100;
@@ -762,9 +763,6 @@ function applyFilter() {
   renderTop10(agg.top10);
 }
 
-function setDateFrom(val) { dateFrom = val; applyFilter(); }
-function setDateTo(val)   { dateTo   = val; applyFilter(); }
-
 function toggleCat(cat) {
   if (activeCats.has(cat)) activeCats.delete(cat);
   else                      activeCats.add(cat);
@@ -780,8 +778,7 @@ function clearAllFilters() {
   document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
   dateFrom = "";
   dateTo   = "";
-  document.getElementById("inputFrom").value = "";
-  document.getElementById("inputTo").value   = "";
+  fpInstance.clear();
   applyFilter();
 }
 
@@ -798,14 +795,19 @@ function clearAllFilters() {
     container.appendChild(btn);
   });
 
-  // limita o calendário ao intervalo de datas disponíveis nos dados
   const dates = ALL_TXS.map(t => t.date).filter(Boolean).sort();
-  if (dates.length) {
-    const from = document.getElementById("inputFrom");
-    const to   = document.getElementById("inputTo");
-    from.min = to.min = dates[0];
-    from.max = to.max = dates[dates.length - 1];
-  }
+  fpInstance = flatpickr("#periodPicker", {
+    mode: "range",
+    dateFormat: "d/m/Y",
+    locale: "pt",
+    minDate: dates[0]              || null,
+    maxDate: dates[dates.length-1] || null,
+    onChange(selectedDates) {
+      dateFrom = selectedDates[0] ? selectedDates[0].toISOString().slice(0, 10) : "";
+      dateTo   = selectedDates[1] ? selectedDates[1].toISOString().slice(0, 10) : "";
+      if (selectedDates.length !== 1) applyFilter();
+    }
+  });
 
   applyFilter();
 })();
