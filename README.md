@@ -93,3 +93,4 @@ pytest
 | `ME_MONGO_URI` | `mongodb://localhost:27017` | URI do MongoDB |
 | `ME_MONGO_DB` | `minhas_economias` | Nome do banco |
 | `ME_COOKIES_FILE` | `~/.config/me-crawler/cookies.json` | Caminho do arquivo de sessão |
+| `ME_OUTPUT_DIR` | `output/` | Diretório onde dashboards e exportações são salvos |

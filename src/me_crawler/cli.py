@@ -98,6 +98,7 @@ def cmd_sync(args) -> None:
 def cmd_dashboard(args) -> None:
     from me_crawler import dashboard  # import tardio: jinja2 só é necessária aqui
 
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     store = TransactionStore()
 
     if args.all:
@@ -105,7 +106,7 @@ def cmd_dashboard(args) -> None:
         if not transactions:
             raise SystemExit("Nenhuma transação no banco. Rode: me-crawler sync")
         title = "Histórico completo"
-        output = Path("dashboard_all.html")
+        output = config.OUTPUT_DIR / "dashboard_all.html"
         dashboard.render(transactions, title, output)
     else:
         year, month = _parse_month(args.month)
@@ -126,7 +127,7 @@ def cmd_dashboard(args) -> None:
         previous = store.get_month(prev_year, prev_month)
 
         title = f"Mês {year:04d}-{month:02d}"
-        output = Path(f"dashboard_{year:04d}-{month:02d}.html")
+        output = config.OUTPUT_DIR / f"dashboard_{year:04d}-{month:02d}.html"
         dashboard.render(transactions, title, output, previous_transactions=previous or None)
 
     print_summary(transactions, title)
@@ -136,6 +137,7 @@ def cmd_dashboard(args) -> None:
 
 
 def cmd_export(args) -> None:
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     store = TransactionStore()
     year, month = _parse_month(args.month)
     transactions = store.get_month(year, month)
@@ -147,9 +149,9 @@ def cmd_export(args) -> None:
 
     stem = f"transactions_{year:04d}-{month:02d}"
     if args.format in ("json", "both"):
-        save_json(transactions, Path(f"{stem}.json"))
+        save_json(transactions, config.OUTPUT_DIR / f"{stem}.json")
     if args.format in ("csv", "both"):
-        save_csv(transactions, Path(f"{stem}.csv"))
+        save_csv(transactions, config.OUTPUT_DIR / f"{stem}.csv")
 
 
 def main() -> None:
