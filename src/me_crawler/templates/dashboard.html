@@ -362,85 +362,51 @@
   {% endif %}
 
   <!-- ── TOP FORNECEDORES ───────────────────────────────────────────── -->
-  {% if suppliers %}
-  <div class="section-title">Top Fornecedores</div>
-  <div class="table-card">
-    <table>
-      <thead>
-        <tr><th></th><th>Fornecedor</th><th>Categoria</th><th style="text-align:right">Transações</th><th style="text-align:right">Ticket médio</th><th style="text-align:right">Total</th></tr>
-      </thead>
-      <tbody>
-        {% for s in suppliers %}
-        <tr>
-          <td class="rank">#{{ loop.index }}</td>
-          <td class="desc" title="{{ s.name }}">{{ s.name | truncate(40) }}</td>
-          <td><span class="tag">{{ s.category }}</span></td>
-          <td class="num">{{ s.count }}x</td>
-          <td class="num">{{ s.avg_ticket | brl }}</td>
-          <td class="val-cell">{{ s.total | brl }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div id="suppliersSection">
+    <div class="section-title">Top Fornecedores</div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr><th></th><th>Fornecedor</th><th>Categoria</th><th style="text-align:right">Transações</th><th style="text-align:right">Ticket médio</th><th style="text-align:right">Total</th></tr>
+        </thead>
+        <tbody id="suppliersBody"></tbody>
+      </table>
+    </div>
   </div>
-  {% endif %}
 
   <!-- ── DUPLICATAS SUSPEITAS ───────────────────────────────────────── -->
-  {% if duplicates %}
-  <div class="section-title">⚠️ Possíveis Duplicatas</div>
-  <div class="warning-card">
-    <div class="warning-title">⚠️ {{ duplicates|length }} par(es) suspeito(s) — mesmo valor e categoria em datas próximas. Verifique se não houve cobrança dupla.</div>
-    <table style="font-size:.8rem">
-      <thead>
-        <tr><th>Descrição A</th><th>Data A</th><th>Descrição B</th><th>Data B</th><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Dias de diferença</th></tr>
-      </thead>
-      <tbody>
-        {% for dup in duplicates %}
-        <tr>
-          <td class="desc" title="{{ dup.tx_a.description }}">{{ dup.tx_a.description | truncate(30) }}</td>
-          <td class="mono">{{ dup.tx_a.date }}</td>
-          <td class="desc" title="{{ dup.tx_b.description }}">{{ dup.tx_b.description | truncate(30) }}</td>
-          <td class="mono">{{ dup.tx_b.date }}</td>
-          <td><span class="tag">{{ dup.category }}</span></td>
-          <td class="val-cell">{{ dup.value | brl }}</td>
-          <td class="num">{{ dup.days_apart }}d</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div id="duplicatesSection">
+    <div class="section-title">⚠️ Possíveis Duplicatas</div>
+    <div class="warning-card">
+      <div class="warning-title" id="duplicatesTitle"></div>
+      <table style="font-size:.8rem">
+        <thead>
+          <tr><th>Descrição A</th><th>Data A</th><th>Descrição B</th><th>Data B</th><th>Categoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Dias de diferença</th></tr>
+        </thead>
+        <tbody id="duplicatesBody"></tbody>
+      </table>
+    </div>
   </div>
-  {% endif %}
 
   <!-- ── PARCELAS EM ABERTO ─────────────────────────────────────────── -->
-  {% if installments %}
-  <div class="section-title">Parcelas em Aberto</div>
-  <div class="chart-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#94a3b8">Total comprometido nos próximos meses</div>
-        <div style="font-size:2rem;font-weight:900;color:#ef4444;margin-top:4px">{{ installments.total_remaining | brl }}</div>
+  <div id="installmentsSection">
+    <div class="section-title">Parcelas em Aberto</div>
+    <div class="chart-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#94a3b8">Total comprometido nos próximos meses</div>
+          <div id="installmentsTotal" style="font-size:2rem;font-weight:900;color:#ef4444;margin-top:4px"></div>
+        </div>
+        <span id="installmentsCount" class="installment-badge"></span>
       </div>
-      <span class="installment-badge">{{ installments.count }} compra(s) parcelada(s)</span>
+      <table>
+        <thead>
+          <tr><th>Descrição</th><th>Categoria</th><th style="text-align:center">Parcela</th><th style="text-align:right">Restam</th><th style="text-align:right">Valor/mês</th><th style="text-align:right">Total restante</th></tr>
+        </thead>
+        <tbody id="installmentsBody"></tbody>
+      </table>
     </div>
-    <table>
-      <thead>
-        <tr><th>Descrição</th><th>Categoria</th><th style="text-align:center">Parcela</th><th style="text-align:right">Restam</th><th style="text-align:right">Valor/mês</th><th style="text-align:right">Total restante</th></tr>
-      </thead>
-      <tbody>
-        {% for inst in installments.entries %}
-        <tr>
-          <td class="desc" title="{{ inst.description }}">{{ inst.description | truncate(40) }}</td>
-          <td><span class="tag">{{ inst.category }}</span></td>
-          <td class="num">{{ inst.current }}/{{ inst.total }}</td>
-          <td class="num">{{ inst.remaining }}x</td>
-          <td class="num">{{ inst.monthly_value | brl }}</td>
-          <td class="val-cell">{{ inst.total_remaining | brl }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
   </div>
-  {% endif %}
 
   <!-- ── ÚLTIMAS TRANSAÇÕES ─────────────────────────────────────────── -->
   {% if a.recent %}
@@ -745,6 +711,102 @@ function renderTop10(top10) {
     : `<tr><td colspan="7" class="empty" style="padding:32px">Nenhum gasto no período filtrado.</td></tr>`;
 }
 
+// ── RENDER FORNECEDORES ───────────────────────────────────────────────────────
+function renderSuppliers(txs) {
+  const sec = document.getElementById("suppliersSection");
+  const gastos = txs.filter(t => t.type === "GASTO" && !t.isDisabled);
+  const map = {};
+  gastos.forEach(t => {
+    const name = (t.description || "—").replace(/\s*\d+\/\d+\s*$/, "").trim();
+    const cat  = catOf(t);
+    if (!map[name]) map[name] = { name, category: cat, total: 0, count: 0 };
+    map[name].total = r2(map[name].total + t.value);
+    map[name].count++;
+  });
+  const rows = Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10);
+  if (!rows.length) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  document.getElementById("suppliersBody").innerHTML = rows.map((s, i) => `
+    <tr>
+      <td class="rank">#${i + 1}</td>
+      <td class="desc" title="${esc(s.name)}">${esc(s.name.slice(0, 40))}</td>
+      <td><span class="tag">${esc(s.category)}</span></td>
+      <td class="num">${s.count}x</td>
+      <td class="num">${brl(r2(s.total / s.count))}</td>
+      <td class="val-cell">${brl(s.total)}</td>
+    </tr>`).join("");
+}
+
+// ── RENDER DUPLICATAS ─────────────────────────────────────────────────────────
+function renderDuplicates(txs) {
+  const sec = document.getElementById("duplicatesSection");
+  const gastos = txs
+    .filter(t => t.type === "GASTO" && !t.isDisabled)
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const suspected = [], seen = new Set();
+  gastos.forEach((t, i) => {
+    gastos.slice(0, i).forEach(prev => {
+      if (Math.abs(new Date(t.date) - new Date(prev.date)) / 86400000 > 3) return;
+      if (t.value !== prev.value || catOf(t) !== catOf(prev)) return;
+      const pair = [t.uuid, prev.uuid].sort().join("|");
+      if (seen.has(pair)) return;
+      seen.add(pair);
+      suspected.push({ tx_a: prev, tx_b: t, value: t.value,
+        category: catOf(t), days_apart: Math.round(Math.abs(new Date(t.date) - new Date(prev.date)) / 86400000) });
+    });
+  });
+  if (!suspected.length) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  document.getElementById("duplicatesTitle").textContent =
+    `⚠️ ${suspected.length} par(es) suspeito(s) — mesmo valor e categoria em datas próximas. Verifique se não houve cobrança dupla.`;
+  document.getElementById("duplicatesBody").innerHTML = suspected.map(d => `
+    <tr>
+      <td class="desc" title="${esc(d.tx_a.description)}">${esc((d.tx_a.description || "—").slice(0, 30))}</td>
+      <td class="mono">${esc(d.tx_a.date)}</td>
+      <td class="desc" title="${esc(d.tx_b.description)}">${esc((d.tx_b.description || "—").slice(0, 30))}</td>
+      <td class="mono">${esc(d.tx_b.date)}</td>
+      <td><span class="tag">${esc(d.category)}</span></td>
+      <td class="val-cell">${brl(d.value)}</td>
+      <td class="num">${d.days_apart}d</td>
+    </tr>`).join("");
+}
+
+// ── RENDER PARCELAS ───────────────────────────────────────────────────────────
+function renderInstallments(txs) {
+  const sec = document.getElementById("installmentsSection");
+  const items = [];
+  let totalRem = 0;
+  txs.filter(t => t.installment && t.type === "GASTO" && !t.isDisabled).forEach(t => {
+    const inst = t.installment;
+    if (typeof inst !== "object") return;
+    const current = inst.currentInstallment || inst.current || inst.number;
+    const total   = inst.totalInstallments  || inst.total;
+    if (!current || !total) return;
+    const rem     = Number(total) - Number(current);
+    if (rem <= 0) return;
+    const monthly = Number(inst.installmentValue || inst.value || t.value || 0);
+    const remVal  = r2(rem * monthly);
+    totalRem = r2(totalRem + remVal);
+    items.push({ description: t.description || "—", category: catOf(t),
+      current: Number(current), total: Number(total), remaining: rem,
+      monthly_value: r2(monthly), total_remaining: remVal });
+  });
+  const top = items.sort((a, b) => b.total_remaining - a.total_remaining).slice(0, 10);
+  if (!top.length) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  document.getElementById("installmentsTotal").textContent = brl(totalRem);
+  document.getElementById("installmentsCount").textContent = `${items.length} compra(s) parcelada(s)`;
+  document.getElementById("installmentsBody").innerHTML = top.map(inst => `
+    <tr>
+      <td class="desc" title="${esc(inst.description)}">${esc(inst.description.slice(0, 40))}</td>
+      <td><span class="tag">${esc(inst.category)}</span></td>
+      <td class="num">${inst.current}/${inst.total}</td>
+      <td class="num">${inst.remaining}x</td>
+      <td class="num">${brl(inst.monthly_value)}</td>
+      <td class="val-cell">${brl(inst.total_remaining)}</td>
+    </tr>`).join("");
+}
+
 // ── FILTROS (categoria + período) ─────────────────────────────────────────────
 function applyFilter() {
   let txs = ALL_TXS;
@@ -761,6 +823,9 @@ function applyFilter() {
   updateKPIs(agg);
   renderRecent(1);
   renderTop10(agg.top10);
+  renderSuppliers(filteredTxs);
+  renderDuplicates(filteredTxs);
+  renderInstallments(filteredTxs);
 }
 
 function toggleCat(cat) {
