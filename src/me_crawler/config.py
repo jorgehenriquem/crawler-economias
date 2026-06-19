@@ -8,7 +8,8 @@ LOGIN_URL = f"{PORTAL_URL}/login"
 SESSION_ALIVE_URL = f"{API_URL}/api/authentication/v2/session/alive"
 TRANSACTIONS_URL = f"{API_URL}/financial-core/v2/transactions"
 
-COOKIES_FILE = Path(os.environ.get("ME_COOKIES_FILE", "cookies.json"))
+COOKIES_FILE = Path(os.environ.get("ME_COOKIES_FILE", "~/.config/me-crawler/cookies.json")).expanduser()
+OUTPUT_DIR   = Path(os.environ.get("ME_OUTPUT_DIR", "output")).expanduser()
 
 STATUSES = "[CONFIRMED, PENDING]"
 DEFAULT_PAGE_SIZE = 100

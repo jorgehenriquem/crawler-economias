@@ -6,9 +6,11 @@ Comandos:
   me-crawler sync [--days 30]               busca transações → MongoDB
   me-crawler dashboard [--month YYYY-MM] [--open]
   me-crawler export [--month YYYY-MM] [--format csv|json|both]
+  me-crawler show [--days 7]                imprime JSON reduzido no stdout
 """
 
 import argparse
+import json
 import logging
 import shutil
 import subprocess
@@ -61,52 +63,75 @@ def cmd_login(_args) -> None:
 
 
 def cmd_sync(args) -> None:
-    store = TransactionStore()
     to_date = date.today()
     from_date = to_date - timedelta(days=args.days)
+    period = f"{from_date.isoformat()} a {to_date.isoformat()}"
 
-    log.info("Sincronizando %s a %s...", from_date.isoformat(), to_date.isoformat())
+    store: TransactionStore | None = None
+    try:
+        store = TransactionStore()
+    except StoreUnavailableError as exc:
+        log.warning("MongoDB indisponível — dados NÃO serão gravados. (%s)", exc)
+
+    log.info("Sincronizando %s...", period)
     client = ApiClient()
     transactions = client.get_transactions(
         from_date=from_date.isoformat(), to_date=to_date.isoformat()
     )
 
-    counts = store.upsert_transactions(transactions)
-    store.record_sync(from_date.isoformat(), to_date.isoformat(), counts)
+    if store is not None:
+        try:
+            counts = store.upsert_transactions(transactions)
+            store.record_sync(from_date.isoformat(), to_date.isoformat(), counts)
+            log.info(
+                "Gravado no banco: %d buscadas, %d novas, %d atualizadas.",
+                counts["fetched"],
+                counts["new"],
+                counts["updated"],
+            )
+        except Exception as exc:
+            log.warning("Erro ao gravar no banco — dados NÃO persistidos. (%s)", exc)
+    else:
+        log.warning("⚠  Dados exibidos abaixo mas NÃO gravados no banco.")
 
-    log.info(
-        "Sync concluído: %d buscadas, %d novas, %d atualizadas.",
-        counts["fetched"],
-        counts["new"],
-        counts["updated"],
-    )
-    print_summary(transactions, f"{from_date.isoformat()} a {to_date.isoformat()}")
+    print_summary(transactions, period)
 
 
 def cmd_dashboard(args) -> None:
     from me_crawler import dashboard  # import tardio: jinja2 só é necessária aqui
 
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     store = TransactionStore()
-    year, month = _parse_month(args.month)
-    transactions = store.get_month(year, month)
 
-    if not transactions:
-        last = store.last_sync()
-        hint = (
-            f"Último sync: {last['at']:%Y-%m-%d %H:%M} ({last['from_date']} a {last['to_date']})."
-            if last
-            else "Nenhum sync registrado ainda."
-        )
-        raise SystemExit(
-            f"Sem transações para {year:04d}-{month:02d} no banco. {hint} Rode: me-crawler sync"
-        )
+    if args.all:
+        transactions = store.get_all()
+        if not transactions:
+            raise SystemExit("Nenhuma transação no banco. Rode: me-crawler sync")
+        title = "Histórico completo"
+        output = config.OUTPUT_DIR / "dashboard_all.html"
+        dashboard.render(transactions, title, output)
+    else:
+        year, month = _parse_month(args.month)
+        transactions = store.get_month(year, month)
 
-    prev_year, prev_month = _previous_month(year, month)
-    previous = store.get_month(prev_year, prev_month)
+        if not transactions:
+            last = store.last_sync()
+            hint = (
+                f"Último sync: {last['at']:%Y-%m-%d %H:%M} ({last['from_date']} a {last['to_date']})."
+                if last
+                else "Nenhum sync registrado ainda."
+            )
+            raise SystemExit(
+                f"Sem transações para {year:04d}-{month:02d} no banco. {hint} Rode: me-crawler sync"
+            )
 
-    title = f"Mês {year:04d}-{month:02d}"
-    output = Path(f"dashboard_{year:04d}-{month:02d}.html")
-    dashboard.render(transactions, title, output, previous_transactions=previous or None)
+        prev_year, prev_month = _previous_month(year, month)
+        previous = store.get_month(prev_year, prev_month)
+
+        title = f"Mês {year:04d}-{month:02d}"
+        output = config.OUTPUT_DIR / f"dashboard_{year:04d}-{month:02d}.html"
+        dashboard.render(transactions, title, output, previous_transactions=previous or None)
+
     print_summary(transactions, title)
 
     if args.open:
@@ -114,6 +139,7 @@ def cmd_dashboard(args) -> None:
 
 
 def cmd_export(args) -> None:
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     store = TransactionStore()
     year, month = _parse_month(args.month)
     transactions = store.get_month(year, month)
@@ -125,9 +151,29 @@ def cmd_export(args) -> None:
 
     stem = f"transactions_{year:04d}-{month:02d}"
     if args.format in ("json", "both"):
-        save_json(transactions, Path(f"{stem}.json"))
+        save_json(transactions, config.OUTPUT_DIR / f"{stem}.json")
     if args.format in ("csv", "both"):
-        save_csv(transactions, Path(f"{stem}.csv"))
+        save_csv(transactions, config.OUTPUT_DIR / f"{stem}.csv")
+
+
+def cmd_show(args) -> None:
+    store = TransactionStore()
+    to_date = date.today()
+    from_date = to_date - timedelta(days=args.days)
+    transactions = store.get_range(from_date.isoformat(), to_date.isoformat())
+
+    rows = [
+        {
+            "date": t.get("date"),
+            "description": t.get("description"),
+            "value": t.get("value"),
+            "category": (t.get("category") or {}).get("categoryName"),
+            "subCategory": (t.get("subCategory") or {}).get("subCategoryName"),
+            "type": t.get("type"),
+        }
+        for t in transactions
+    ]
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
 def main() -> None:
@@ -150,6 +196,7 @@ def main() -> None:
 
     p_dash = sub.add_parser("dashboard", help="Gera dashboard HTML a partir do MongoDB")
     p_dash.add_argument("--month", help="Mês no formato YYYY-MM (padrão: mês atual)")
+    p_dash.add_argument("--all", action="store_true", help="Usa todo o histórico disponível no banco")
     p_dash.add_argument("--open", action="store_true", help="Abre o HTML no browser")
     p_dash.set_defaults(func=cmd_dashboard)
 
@@ -158,11 +205,20 @@ def main() -> None:
     p_exp.add_argument("--format", choices=["csv", "json", "both"], default="both")
     p_exp.set_defaults(func=cmd_export)
 
+    p_show = sub.add_parser("show", help="Imprime transações dos últimos N dias em JSON no stdout")
+    p_show.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Número de dias para trás (padrão: 7)",
+    )
+    p_show.set_defaults(func=cmd_show)
+
     args = parser.parse_args()
     try:
         args.func(args)
     except StoreUnavailableError as exc:
-        log.error("%s", exc)
+        log.error("MongoDB indisponível (necessário para este comando): %s", exc)
         sys.exit(2)
 
 
